@@ -1340,8 +1340,8 @@ class PlominoForm(ATFolder):
             submittedValue = REQUEST.get(fieldname)
 
             # STEP 1: check mandatory fields
-            if not submittedValue:
-                if f.getMandatory() is True:
+            if f.getMandatory() is True:
+                if not submittedValue:
                     if fieldtype == "ATTACHMENT" and doc:
                         existing_files = doc.getItem(fieldname)
                         if not existing_files:
