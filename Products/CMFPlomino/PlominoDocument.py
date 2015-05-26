@@ -361,10 +361,10 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
         """
         db = self.getParentDatabase()
         form = db.getForm(REQUEST.get('Form'))
-        errors = form.validateInputs(REQUEST, doc=self)
+        errors, error_fields = form.validateInputs(REQUEST, doc=self)
         if errors:
             return self.errors_json(
-                    errors=json.dumps({'success': False, 'errors': errors}))
+                    errors=json.dumps({'success': False, 'errors': errors, 'fields': error_fields}))
         else:
             return self.errors_json(
                     errors=json.dumps({'success': True}))
@@ -376,7 +376,7 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
         db = self.getParentDatabase()
         form = db.getForm(REQUEST.get('Form'))
 
-        errors = form.validateInputs(REQUEST, doc=self)
+        errors, error_fields = form.validateInputs(REQUEST, doc=self)
 
         # execute the beforeSave code of the form
         error = None

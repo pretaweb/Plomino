@@ -386,7 +386,7 @@ class PlominoForm(ATFolder):
             is_childform = True
 
         # validate submitted values
-        errors = self.validateInputs(REQUEST)
+        errors, error_fields = self.validateInputs(REQUEST)
         if errors:
             if is_childform:
                 return ("""<html><body><span id="plomino_child_errors">"""
@@ -1267,10 +1267,10 @@ class PlominoForm(ATFolder):
     def validation_errors(self, REQUEST):
         """ Check submitted values
         """
-        errors = self.validateInputs(REQUEST)
+        errors, error_fields = self.validateInputs(REQUEST)
         if errors:
             return self.errors_json(
-                    errors=json.dumps({'success': False, 'errors': errors}))
+                    errors=json.dumps({'success': False, 'errors': errors, 'fields': error_fields}))
         else:
             return self.errors_json(
                     errors=json.dumps({'success': True}))
@@ -1312,6 +1312,7 @@ class PlominoForm(ATFolder):
         """
         """
         errors=[]
+        error_fields = []
         fields = self.getFormFields(
                 includesubforms=True,
                 doc=doc,
@@ -1348,10 +1349,12 @@ class PlominoForm(ATFolder):
                             errors.append("%s %s" % (
                                 f.Title(),
                                 PlominoTranslate("is mandatory", self)))
+                            error_fields.append(fieldname)
                     else:
                         errors.append("%s %s" % (
                             f.Title(),
                             PlominoTranslate("is mandatory", self)))
+                        error_fields.append(fieldname)
             else:
                 #
                 # STEP 2: check validation formula
@@ -1372,12 +1375,16 @@ class PlominoForm(ATFolder):
                         e.reportError('%s validation formula failed' % f.id)
                     if error_msg:
                         errors.append(error_msg)
+                        error_fields.append(fieldname)
                 #
                 # STEP 3: check data types
                 #
-                errors = errors + f.validateFormat(submittedValue)
+                format_errors = f.validateFormat(submittedValue)
+                if format_errors:
+                    errors = errors + format_errors
+                    error_fields.append(fieldname)
 
-        return errors
+        return errors, error_fields
 
     security.declarePublic('notifyErrors')
     def notifyErrors(self, errors):
