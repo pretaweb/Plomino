@@ -386,11 +386,12 @@ class PlominoForm(ATFolder):
             is_childform = True
 
         # validate submitted values
-        errors, error_fields = self.validateInputs(REQUEST)
+        errors = self.validateInputs(REQUEST)
         if errors:
             if is_childform:
+                msgs = [x['error'] for x in errors]
                 return ("""<html><body><span id="plomino_child_errors">"""
-                    """%s</span></body></html>""" % " - ".join(errors))
+                        """%s</span></body></html>""" % " - ".join(msgs))
             return self.notifyErrors(errors)
 
         ################################################################
@@ -1267,10 +1268,10 @@ class PlominoForm(ATFolder):
     def validation_errors(self, REQUEST):
         """ Check submitted values
         """
-        errors, error_fields = self.validateInputs(REQUEST)
+        errors = self.validateInputs(REQUEST)
         if errors:
             return self.errors_json(
-                    errors=json.dumps({'success': False, 'errors': errors, 'fields': error_fields}))
+                    errors=json.dumps({'success': False, 'errors': errors}))
         else:
             return self.errors_json(
                     errors=json.dumps({'success': True}))
@@ -1312,7 +1313,6 @@ class PlominoForm(ATFolder):
         """
         """
         errors=[]
-        error_fields = []
         fields = self.getFormFields(
                 includesubforms=True,
                 doc=doc,
@@ -1340,21 +1340,21 @@ class PlominoForm(ATFolder):
             fieldtype = f.getFieldType()
             submittedValue = REQUEST.get(fieldname)
 
+            field_errors = []
+
             # STEP 1: check mandatory fields
             if f.getMandatory() is True:
                 if not submittedValue:
                     if fieldtype == "ATTACHMENT" and doc:
                         existing_files = doc.getItem(fieldname)
                         if not existing_files:
-                            errors.append("%s %s" % (
+                            field_errors.append("%s %s" % (
                                 f.Title(),
                                 PlominoTranslate("is mandatory", self)))
-                            error_fields.append(fieldname)
                     else:
-                        errors.append("%s %s" % (
+                        field_errors.append("%s %s" % (
                             f.Title(),
                             PlominoTranslate("is mandatory", self)))
-                        error_fields.append(fieldname)
             else:
                 #
                 # STEP 2: check validation formula
@@ -1374,21 +1374,22 @@ class PlominoForm(ATFolder):
                     except PlominoScriptException, e:
                         e.reportError('%s validation formula failed' % f.id)
                     if error_msg:
-                        errors.append(error_msg)
-                        error_fields.append(fieldname)
+                        field_errors.append(error_msg)
                 #
                 # STEP 3: check data types
                 #
                 format_errors = f.validateFormat(submittedValue)
                 if format_errors:
-                    errors = errors + format_errors
-                    error_fields.append(fieldname)
+                    field_errors = field_errors + format_errors
 
-        return errors, error_fields
+            for field_error in field_errors:
+                errors.append({'field': fieldname, 'error': field_error})
+
+        return errors
 
     security.declarePublic('notifyErrors')
     def notifyErrors(self, errors):
-        return self.ErrorMessages(errors=errors)
+        return self.ErrorMessages(errors=[x[1] for x in errors])
 
     security.declareProtected(DESIGN_PERMISSION, 'manage_generateView')
     def manage_generateView(self, REQUEST=None):
