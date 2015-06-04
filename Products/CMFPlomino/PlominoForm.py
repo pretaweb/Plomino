@@ -545,8 +545,17 @@ class PlominoForm(ATFolder):
           is (as for missing field markup).
         """
         html_content_processed = html_content_orig # We edit the copy
-        match_iter = label_re.finditer(html_content_orig)
-        for match_label in match_iter:
+        from lxml import etree
+
+        dom = etree.HTML(html_content_processed)
+
+        # interate over all the labels
+        # if there is stuff inbetween its field then grab it too
+        # create fieldset around teh field and put in the label and inbetween stuff
+
+        for label_node in dom.xpath("//span[@class='plominoLabelClass']"):
+
+            match_label = label_re.finditer(etree.toString(label_node))[0]
             d = match_label.groupdict()
             if d['optional_fieldname']:
                 fn = d['optional_fieldname']
@@ -562,6 +571,14 @@ class PlominoForm(ATFolder):
                     label = field.Title()
                 else:
                     continue
+
+
+            field_node = dom.xpath(".//span[@class='plominoFieldClass' and text()='%s']" % fn)[0]
+            # now see if we can grab the nodes inbetween
+            last_ancestor = field_node.ancestors().intersect(label_node.ancestors())[-1]
+
+            #find out the start and end index of these nodes in the original text and remove them
+
 
             field_re = re.compile('<span class="plominoFieldClass">%s</span>' % fn)
             match_field = field_re.search(html_content_processed)
