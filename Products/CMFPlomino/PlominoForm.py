@@ -1389,7 +1389,7 @@ class PlominoForm(ATFolder):
 
     security.declarePublic('notifyErrors')
     def notifyErrors(self, errors):
-        return self.ErrorMessages(errors=[x[1] for x in errors])
+        return self.ErrorMessages(errors=errors)
 
     security.declareProtected(DESIGN_PERMISSION, 'manage_generateView')
     def manage_generateView(self, REQUEST=None):

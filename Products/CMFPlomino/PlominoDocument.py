@@ -389,7 +389,7 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
             e.reportError('Form submitted, but beforeSave formula failed')
 
         if error:
-            errors.append(error)
+            errors.append({'field': 'beforeSave', 'error': error})
 
         # if errors, stop here, and notify errors to user
         if errors:
