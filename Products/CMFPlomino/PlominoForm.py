@@ -1343,8 +1343,8 @@ class PlominoForm(ATFolder):
             field_errors = []
 
             # STEP 1: check mandatory fields
-            if f.getMandatory() is True:
-                if not submittedValue:
+            if not submittedValue:
+                if f.getMandatory() is True:
                     if fieldtype == "ATTACHMENT" and doc:
                         existing_files = doc.getItem(fieldname)
                         if not existing_files:
