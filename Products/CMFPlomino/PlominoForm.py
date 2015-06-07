@@ -555,7 +555,7 @@ class PlominoForm(ATFolder):
 
         for label_node in dom.xpath("//span[@class='plominoLabelClass']"):
 
-            match_label = label_re.finditer(etree.toString(label_node))[0]
+            match_label = list(label_re.finditer(etree.tostring(label_node)))[0]
             d = match_label.groupdict()
             if d['optional_fieldname']:
                 fn = d['optional_fieldname']
@@ -575,9 +575,29 @@ class PlominoForm(ATFolder):
 
             field_node = dom.xpath(".//span[@class='plominoFieldClass' and text()='%s']" % fn)[0]
             # now see if we can grab the nodes inbetween
-            last_ancestor = field_node.ancestors().intersect(label_node.ancestors())[-1]
+            field_ancestors= list(field_node.iterancestors())
+            start = end = None
 
-            #find out the start and end index of these nodes in the original text and remove them
+            i = 0
+            label_ancestors = list(label_node.iterancestors())
+            for a in label_ancestors:
+                if a in field_ancestors:
+                    # child of common ancestor
+                    start = label_ancestors[i-1]
+                    end = field_ancestors[field_ancestors.index(a)-1]
+                    break
+                i = i + 1
+            #import pdb; pdb.set_trace()
+            #description = []
+            #for node in start.iter_nextsiblings():
+            #    if node == end:
+            #        break
+            #    description.append(node)
+            #    node.remove()
+            #end.remove()
+
+            # replace the label
+
 
 
             field_re = re.compile('<span class="plominoFieldClass">%s</span>' % fn)
