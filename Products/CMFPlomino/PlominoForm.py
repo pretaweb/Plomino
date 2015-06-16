@@ -567,7 +567,8 @@ class PlominoForm(ATFolder):
             match_field = field_re.search(html_content_processed)
             field_type = field.getFieldType()
             if field_type != 'DATETIME':
-                widget_name = field.getSettings().widget
+                if hasattr(field.getSettings(), 'widget'):
+                    widget_name = field.getSettings().widget
 
             # Handle input groups:
             if (field_type == 'DATETIME' or
