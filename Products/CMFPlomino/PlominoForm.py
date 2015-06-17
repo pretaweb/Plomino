@@ -42,6 +42,7 @@ from Products.CMFPlomino.PlominoUtils import DateToString, StringToDate
 from Products.CMFPlomino.PlominoUtils import PlominoTranslate
 from Products.CMFPlomino.PlominoUtils import translate
 import interfaces
+from pyquery import PyQuery as pq
 
 schema = Schema((
     StringField(
@@ -545,108 +546,160 @@ class PlominoForm(ATFolder):
           is (as for missing field markup).
         """
         html_content_processed = html_content_orig # We edit the copy
-        from lxml import etree
+        #from lxml import etree
 
-        dom = etree.HTML(html_content_processed)
+        #dom = etree.HTML(html_content_processed)
+        d = pq(html_content_processed)
 
         # interate over all the labels
         # if there is stuff inbetween its field then grab it too
         # create fieldset around teh field and put in the label and inbetween stuff
 
-        for label_node in dom.xpath("//span[@class='plominoLabelClass']"):
+        for label_node in d("span.plominoLabelClass"):
 
-            match_label = list(label_re.finditer(etree.tostring(label_node)))[0]
-            d = match_label.groupdict()
-            if d['optional_fieldname']:
-                fn = d['optional_fieldname']
-                field = self.getFormField(fn)
-                if field:
-                    label = d['fieldname_or_label']
-                else:
-                    continue
-            else:
-                fn = d['fieldname_or_label']
-                field = self.getFormField(fn)
-                if field:
-                    label = field.Title()
-                else:
-                    continue
+#            match_label = list(label_re.finditer(etree.tostring(label_node)))[0]
+#            d = match_label.groupdict()
+            label_text = None
+            try:
+                field_id, label_text = pq(label_node).text().split(':',1)
+                label_text = label_text.strip()
+            except:
+                field_id = pq(label_node).text()
+            field_id = field_id.strip()
+            field = self.getFormField(field_id)
+            if label_text is None:
+                label_text = field.Title()
 
 
-            field_node = dom.xpath(".//span[@class='plominoFieldClass' and text()='%s']" % fn)[0]
+#            field_node = d("span.plominoFieldClass:contains('%s')" % fn)[0]
             # now see if we can grab the nodes inbetween
-            field_ancestors= list(field_node.iterancestors())
-            start = end = None
-
-            i = 0
-            label_ancestors = list(label_node.iterancestors())
-            for a in label_ancestors:
-                if a in field_ancestors:
-                    # child of common ancestor
-                    start = label_ancestors[i-1]
-                    end = field_ancestors[field_ancestors.index(a)-1]
-                    break
-                i = i + 1
-            #import pdb; pdb.set_trace()
-            #description = []
-            #for node in start.iter_nextsiblings():
-            #    if node == end:
+            #field_ancestors= list(field_node.iterancestors())
+            #start = end = None
+            #
+            #i = 0
+            #label_ancestors = list(label_node.iterancestors())
+            #for a in label_ancestors:
+            #    if a in field_ancestors:
+            #        # child of common ancestor
+            #        start = label_ancestors[i-1]
+            #        end = field_ancestors[field_ancestors.index(a)-1]
             #        break
-            #    description.append(node)
-            #    node.remove()
-            #end.remove()
+            #    i = i + 1
+
+            #field_node.first(":parent")
+            # do a breadth first search but starting at the label and going up
+            togroup = []
+            field_node = None
+            for parent in  [label_node] + [n for n in reversed(pq(label_node).parents())]:
+                #parent.next("span.plominoFieldClass")
+                if field_node:
+                    break
+                togroup = [parent]
+                for sibling in pq(parent).next_all():
+                    togroup.append(sibling)
+                    field_node = pq(sibling)("span.plominoFieldClass").eq(0)
+                    if not field_node:
+                        continue
+                    elif field_node.text().strip() == field_id:
+                        break
+                    else:
+                        field_node = None
+                        togroup = []
+                        break
+
+            field_type = field.getFieldType()
+            if field_type != 'DATETIME':
+                widget_name = field.getSettings().widget
+
+            compound_widget = (field_type == 'DATETIME' or
+                    field_type == 'SELECTION' and
+                    widget_name in ['CHECKBOX', 'RADIO', 'PICKLIST'])
+
+            # groupit: take label, inbetween, field and wrap it in a container
+            # if its a compound widget like datetime or selection then use a fieldset and legend
+            # if a simple widget then just a div
+            if editmode:
+                legend = pq("<label for='%s'></span>" % field_id)
+            else:
+                legend = pq("<span class='legend'></span>")
+            grouping = ""
+            if togroup:
+                if compound_widget and editmode:
+                    if field.getMandatory():
+                        grouping = "<fieldset class='required'></fieldset>"
+                    else:
+                        grouping = "<fieldset class='required'></fieldset>"
+                    legend = pq("<legend></legend>")
+                elif pq(togroup[0]).has_class("td"):
+                    # we don't want to group a table row
+                    togroup = []
+                elif pq(togroup[0]).has_class("span"):
+                    # we want to wrap in a div
+                    grouping = '<span class="plominoFieldGroup"></span>'
+                else:
+                    grouping = '<div class="plominoFieldGroup"></div>'
+            legend.append(label_text)
+            pq(label_node).replace_with(legend)
+            wrapped = pq(togroup).wrap_all(grouping)
+
+                #for n in togroup:
+                #    n.remove()
+                #    grouping.append(n)
+
+        return d.html()
+
+
+
+
 
             # replace the label
 
 
 
-            field_re = re.compile('<span class="plominoFieldClass">%s</span>' % fn)
-            match_field = field_re.search(html_content_processed)
-            field_type = field.getFieldType()
-            if field_type != 'DATETIME':
-                widget_name = field.getSettings().widget
+            #field_re = re.compile('<span class="plominoFieldClass">%s</span>' % fn)
+            #match_field = field_re.search(html_content_processed)
+            #
+            ## Handle input groups:
+            #if (field_type == 'DATETIME' or
+            #        field_type == 'SELECTION' and
+            #        widget_name in ['CHECKBOX', 'RADIO', 'PICKLIST']):
+            #    # Delete processed label
+            #    html_content_processed = label_re.sub('', html_content_processed, count=1)
+            #    # Is the field in the layout?
+            #    if match_field:
+            #        # Markup the field
+            #        if editmode:
+            #            mandatory = (
+            #                    field.getMandatory()
+            #                    and " class='required'"
+            #                    or '')
+            #            html_content_processed = field_re.sub(
+            #                    "<fieldset><legend%s>%s</legend>%s</fieldset>" % (
+            #                    mandatory, label, match_field.group()),
+            #                    html_content_processed)
+            #        else:
+            #            html_content_processed = field_re.sub(
+            #                    "<div class='fieldset'><span class='legend' title='Legend for %s'>%s</span>%s</div>" % (
+            #                    fn, label, match_field.group()),
+            #                    html_content_processed)
+            #
+            ## Handle single inputs:
+            #else:
+            #    # Replace the processed label with final markup
+            #    if editmode and (field_type not in ['COMPUTED', 'DISPLAY']):
+            #        mandatory = (
+            #                field.getMandatory()
+            #                and " class='required'"
+            #                or '')
+            #        html_content_processed = label_re.sub(
+            #                "<label for='%s'%s>%s</label>" % (fn, mandatory, label),
+            #                html_content_processed, count=1)
+            #    else:
+            #        html_content_processed = label_re.sub(
+            #                "<span class='label' title='Label for %s'>%s</span>" % (fn, label),
+            #                html_content_processed, count=1)
 
-            # Handle input groups:
-            if (field_type == 'DATETIME' or
-                    field_type == 'SELECTION' and 
-                    widget_name in ['CHECKBOX', 'RADIO', 'PICKLIST']):
-                # Delete processed label
-                html_content_processed = label_re.sub('', html_content_processed, count=1)
-                # Is the field in the layout?
-                if match_field:
-                    # Markup the field
-                    if editmode:
-                        mandatory = (
-                                field.getMandatory()
-                                and " class='required'"
-                                or '')
-                        html_content_processed = field_re.sub(
-                                "<fieldset><legend%s>%s</legend>%s</fieldset>" % (
-                                mandatory, label, match_field.group()),
-                                html_content_processed)
-                    else:
-                        html_content_processed = field_re.sub(
-                                "<div class='fieldset'><span class='legend' title='Legend for %s'>%s</span>%s</div>" % (
-                                fn, label, match_field.group()),
-                                html_content_processed)
-
-            # Handle single inputs:
-            else:
-                # Replace the processed label with final markup
-                if editmode and (field_type not in ['COMPUTED', 'DISPLAY']):
-                    mandatory = (
-                            field.getMandatory()
-                            and " class='required'"
-                            or '')
-                    html_content_processed = label_re.sub(
-                            "<label for='%s'%s>%s</label>" % (fn, mandatory, label),
-                            html_content_processed, count=1)
-                else:
-                    html_content_processed = label_re.sub(
-                            "<span class='label' title='Label for %s'>%s</span>" % (fn, label),
-                            html_content_processed, count=1)
-
-        return html_content_processed
+        #return html_content_processed
 
 
     security.declareProtected(READ_PERMISSION, 'displayDocument')
