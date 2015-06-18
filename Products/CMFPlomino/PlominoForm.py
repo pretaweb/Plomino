@@ -549,6 +549,7 @@ class PlominoForm(ATFolder):
         #from lxml import etree
 
         #dom = etree.HTML(html_content_processed)
+#        d = pq(html_content_processed, parser='html_fragments')
         d = pq(html_content_processed)
 
         # interate over all the labels
@@ -557,8 +558,7 @@ class PlominoForm(ATFolder):
 
         for label_node in d("span.plominoLabelClass"):
 
-#            match_label = list(label_re.finditer(etree.tostring(label_node)))[0]
-#            d = match_label.groupdict()
+            # work out the fieldid the label is for, and its text
             label_text = None
             try:
                 field_id, label_text = pq(label_node).text().split(':',1)
@@ -569,22 +569,6 @@ class PlominoForm(ATFolder):
             field = self.getFormField(field_id)
             if label_text is None:
                 label_text = field.Title()
-
-
-#            field_node = d("span.plominoFieldClass:contains('%s')" % fn)[0]
-            # now see if we can grab the nodes inbetween
-            #field_ancestors= list(field_node.iterancestors())
-            #start = end = None
-            #
-            #i = 0
-            #label_ancestors = list(label_node.iterancestors())
-            #for a in label_ancestors:
-            #    if a in field_ancestors:
-            #        # child of common ancestor
-            #        start = label_ancestors[i-1]
-            #        end = field_ancestors[field_ancestors.index(a)-1]
-            #        break
-            #    i = i + 1
 
             #field_node.first(":parent")
             # do a breadth first search but starting at the label and going up
@@ -619,33 +603,43 @@ class PlominoForm(ATFolder):
             # if its a compound widget like datetime or selection then use a fieldset and legend
             # if a simple widget then just a div
             if editmode:
-                legend = pq("<label for='%s'></span>" % field_id)
+                legend = "<label for='%s'></span>" % field_id
             else:
-                legend = pq("<span class='legend'></span>")
+                legend = "<span class='legend'></span>"
             grouping = ""
-            if togroup:
+            if togroup and pq(togroup).is_("span"):
+                # we want to wrap in a div
+                grouping = '<span class="plominoFieldGroup"></span>'
+            elif togroup and (pq(togroup).is_("div") or pq(togroup).is_("p")):
                 if compound_widget and editmode:
                     if field.getMandatory():
                         grouping = "<fieldset class='required'></fieldset>"
                     else:
-                        grouping = "<fieldset class='required'></fieldset>"
-                    legend = pq("<legend></legend>")
-                elif pq(togroup[0]).has_class("td"):
-                    # we don't want to group a table row
-                    togroup = []
-                elif pq(togroup[0]).has_class("span"):
-                    # we want to wrap in a div
-                    grouping = '<span class="plominoFieldGroup"></span>'
+                        grouping = "<fieldset></fieldset>"
+                    legend = "<legend></legend>"
                 else:
                     grouping = '<div class="plominoFieldGroup"></div>'
-            legend.append(label_text)
-            pq(label_node).replace_with(legend)
-            wrapped = pq(togroup).wrap_all(grouping)
+            else:
+                # we don't want to group a table row or list elements
+                togroup = []
+            #wrapped = pq(togroup).wrap_all(grouping)
 
-                #for n in togroup:
-                #    n.remove()
-                #    grouping.append(n)
+            # my own wrap method
+            if grouping:
+                #import pdb; pdb.set_trace()
+                try:
+                    ng = pq(grouping).insert_before(pq(togroup).eq(0))
+                    pq(ng).append(pq(togroup))
+                except:
+                    import pdb; pdb.set_trace()
+                    raise
 
+            #switch the label last so insert_before works properly
+            legend = pq(legend).append(label_text)
+            legend = pq(label_node).replace_with(legend)
+
+
+        #return "".join([pq(n).html(method="html") for n in d.next_all()])
         return d.html()
 
 
