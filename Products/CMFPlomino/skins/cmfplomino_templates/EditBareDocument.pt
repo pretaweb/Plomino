@@ -11,6 +11,7 @@
 <head tal:define="view context/@@plone;
                   ajax_load request/ajax_load | nothing;
                   ajax_include_head request/ajax_include_head | nothing;
+                  hasDynamicHidewhen python:form.hasDynamicHidewhen();
                   "
       tal:condition="python: not ajax_load or ajax_include_head">
     <div tal:replace="structure provider:plone.resourceregistries.styles" />
@@ -30,27 +31,7 @@
     <tal:has_googleviz condition="python:here.getForm().hasGoogleVisualizationField()">
         <script type='text/javascript' src='//www.google.com/jsapi'></script>
     </tal:has_googleviz>
-    <script
-        type="text/javascript"
-        tal:condition="python:here.getForm().hasDynamicHidewhen()"
-        tal:content="string:
-function refreshHidewhen() {
-    var onsuccess = function(data, textStatus, xhr) {
-        for (var hw in data)
-            jQuery('.hidewhen-' + hw).css('display', data[hw]?'none':'block');
-    }
-    jQuery.ajax({
-        type: '${form_method}',
-        url: 'computehidewhens',
-        data: jQuery('#plomino_form').serialize(),
-        success: onsuccess,
-        dataType: 'json' 
-    });
-}
-jQuery(document).ready( function() {
-    jQuery('form :input').change(refreshHidewhen);
-});">
-    </script>
+    <tal:hidewhen-js metal:use-macro="here/view_macros/macros/HideWhenMacro">hidewhen-js</tal:hidewhen-js>
     <tal:block_hasjsresources 
         tal:define="jsresources python:form.get_resources_js()"
         tal:condition="jsresources"
