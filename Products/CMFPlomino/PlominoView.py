@@ -389,12 +389,7 @@ class PlominoView(ATFolder):
     def getColumns(self):
         """ Get columns
         """
-        # TODO: why not just `return self.contentValues(filter='PlominoColumn')`?
-        columnslist = self.portal_catalog.search(
-                {'portal_type': ['PlominoColumn'],
-                    'path': '/'.join(self.getPhysicalPath())},
-                sort_index='getObjPositionInParent')
-        return [c.getObject() for c in columnslist]
+        return self.contentValues(filter={'portal_type': 'PlominoColumn'})
 
     security.declarePublic('getActions')
     def getActions(self, view, hide=True):
