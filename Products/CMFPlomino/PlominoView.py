@@ -540,9 +540,10 @@ class PlominoView(ATFolder):
         summable.
         """
         sums = {}
-        brains = self.getAllDocuments(getObject=False)
-        for column in self.getColumns():
-            if column.DisplaySum:
+        columns = [col for col in self.getColumns() if col.DisplaySum]
+        if columns:
+            brains = self.getAllDocuments(getObject=False)
+            for column in columns:
                 indexkey = self.getIndexKey(column.getColumnName())
                 values = [getattr(b, indexkey) for b in brains]
                 try:
