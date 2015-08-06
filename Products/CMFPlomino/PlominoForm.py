@@ -347,7 +347,7 @@ class PlominoForm(ATFolder):
 
         form = self
         while getattr(form, 'meta_type', '') != 'PlominoForm':
-            form = obj.aq_parent
+            form = form.aq_parent
         return form
 
     def getFormMethod(self):
@@ -1688,7 +1688,7 @@ class PlominoForm(ATFolder):
         return True
 
     security.declarePublic('tojson')
-    def tojson(self, REQUEST=None, item=None):
+    def tojson(self, REQUEST=None, item=None, rendered=False):
         """ Return field value as JSON.
         If item=None, return all field values.
         (Note: we use 'item' instead of 'field' to match the
@@ -1700,6 +1700,9 @@ class PlominoForm(ATFolder):
                     'content-type',
                     'application/json; charset=utf-8')
             item = REQUEST.get('item', item)
+            rendered_str = REQUEST.get('rendered', None)
+            if rendered_str:
+                rendered = True
             datatables_format_str = REQUEST.get('datatables', None)
             if datatables_format_str:
                 datatables_format = True
@@ -1717,6 +1720,9 @@ class PlominoForm(ATFolder):
             if field:
                 adapt = field.getSettings()
                 result = adapt.getFieldValue(self, request=REQUEST)
+                if field.getFieldType() == 'DATAGRID':
+                    result = adapt.rows(
+                            result, rendered=rendered)
 
         if datatables_format:
             result = {
