@@ -12,6 +12,7 @@
             associated_form_url python:associated_form and associated_form.absolute_url();
             associated_form_rendering python:field.getSettings().associated_form_rendering;
             new_fields python:field.getSettings().getRenderedFields(creation=True,request=request);
+            add_extra_row python:field.getSettings().add_default_row == True and 'ADDEXTRAROW' or '';
             ">
 <input type='hidden'
     tal:attributes="
@@ -93,7 +94,16 @@
                             ${fieldname}_nEditing = null;
                         });
                     }
-                    /** 
+                    /**
+                        START WITH DEFAULT ROWS
+                    **/
+
+                    if('${add_extra_row}' ==='ADDEXTRAROW'){
+                        //console.log('Adding extra row (' + ${fieldname}_datatable.Rows.Count() + ')');
+                        //var ${fieldname}_nEditing = null;
+                        //${fieldname}_nEditing = datagrid_add_inline_row( ${fieldname}_datatable,  ${new_fields} )
+                    }
+                    /**
                         MODAL MODE
                     **/
                     else{

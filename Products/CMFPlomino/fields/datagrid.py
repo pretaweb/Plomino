@@ -24,7 +24,7 @@ from zope import component
 from zope.pagetemplate.pagetemplatefile import PageTemplateFile
 from zope.schema import getFields
 from zope.schema.vocabulary import SimpleVocabulary
-from zope.schema import Text, TextLine, Choice
+from zope.schema import Text, TextLine, Choice, Bool
 
 # Plomino
 from Products.CMFPlomino.browser import PlominoMessageFactory as _
@@ -62,6 +62,12 @@ class IDatagridField(IBaseField):
             title=u'Associate form rendering',
             description=u'Associate form rendering',
             default="MODAL",
+            required=True)
+
+    add_default_row = Bool(
+            title=u'Add default row',
+            description=u'Whether to have an empty row when the field is blank',
+            default=False,
             required=True)
 
     field_mapping = TextLine(
