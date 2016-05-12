@@ -790,7 +790,8 @@ class PlominoForm(ATFolder):
             # Remove the old node
             pq(linkto_node).remove()
 
-        return d.html()
+        output = d.html() or ''
+        return output
 
     def _handleMultiPage(self, html_content_orig, request):
         """
@@ -1034,7 +1035,7 @@ class PlominoForm(ATFolder):
             if subform:
                 subformrendering = subform.displayDocument(
                         doc, editmode, creation, parent_form_id=self.id,
-                        request=request)
+                        request=request) or ''
                 html_content = html_content.replace(
                         '<span class="plominoSubformClass">%s</span>' %
                         subformname,
