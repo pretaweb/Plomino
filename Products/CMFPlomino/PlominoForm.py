@@ -736,7 +736,6 @@ class PlominoForm(ATFolder):
 
             # my own wrap method
             if grouping:
-                #import pdb; pdb.set_trace()
                 try:
                     ng = pq(grouping).insert_before(pq(togroup).eq(0))
                     pq(ng).append(pq(togroup))
@@ -800,7 +799,6 @@ class PlominoForm(ATFolder):
         - if there are no more pages to view, return None so that the form can
         be submitted and a document created
         """
-
         action = None
         # If this is initial page load, show the first page and don't
         # try to do any paging
@@ -869,7 +867,7 @@ class PlominoForm(ATFolder):
                     if page > num_pages:
                         # Return none for a form so a doc can be created
                         # Otherwise it's up to form events to handle paging
-                        if not self.isPage():
+                        if not self.isPage:
                             return None
 
                     # Check for page content. If the page is empty (because)
@@ -950,7 +948,10 @@ class PlominoForm(ATFolder):
                 return self.createDocument(request)
 
         # get the field lists
-        fields = self.getFormFields(doc=doc, request=request)
+        if self.getIsMulti():
+            fields = self.getFormFields(doc=doc, request=request, includesubforms=True)
+        else:
+            fields = self.getFormFields(doc=doc, request=request)
         fields_in_layout = []
         fieldids_not_in_layout = []
         for field in fields:
@@ -1070,6 +1071,19 @@ class PlominoForm(ATFolder):
                 else:
                     action_render = ''
                 html_content = html_content.replace(action_span, action_render)
+
+        # If on the parent form, clean up the hidden inputs
+        if not parent_form_id:
+            to_replace = []
+            html = pq(html_content)
+            hidden_inputs = html('input[type="hidden"]')
+            for hidden_input in hidden_inputs:
+                name = hidden_input.name
+                if html('input[name="%s"]' % name).size() > 1:
+                    to_replace.append(pq(hidden_input).outer_html())
+
+            for item in to_replace:
+                html_content = html_content.replace(item, '')
 
         # translation
         html_content = translate(self, html_content)
@@ -1726,19 +1740,32 @@ class PlominoForm(ATFolder):
         if not errors:
             return errors
 
+        # Create a temp doc
+        db = self.getParentDatabase()
+        doc = getTemporaryDocument(
+            db,
+            self,
+            REQUEST
+        )
+
         # Get the current_page if possible
         if not current_page:
-            db = self.getParentDatabase()
-            # Create a temp doc
-            doc = getTemporaryDocument(
-                db,
-                self,
-                REQUEST
-            )
             html_content = self.applyHideWhen(doc, silent_error=False)
             d = pq(html_content)
             page = int(REQUEST.get('plomino_current_page', 0))
             current_page = d('div.plomino-accordion-content').eq(page)
+        else:
+            # Make a clone of the page
+            current_page = current_page.clone()
+
+        # Unwrap subforms
+        subforms = current_page('span.plominoSubformClass')
+        for subform in subforms:
+            form_id = subform.text
+            sf = db.getForm(form_id)
+            subform_html = pq(sf.applyHideWhen(doc, silent_error=False))
+            current_page.append(subform_html)
+        current_page.remove('span.plominoSubformClass')
 
         # Check for errors on the current page
         fields_on_page = [f.text for f in current_page.find('span.plominoFieldClass')]
