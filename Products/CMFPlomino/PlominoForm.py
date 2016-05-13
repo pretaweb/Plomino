@@ -961,44 +961,6 @@ class PlominoForm(ATFolder):
             else:
                 fieldids_not_in_layout.append(field.id)
 
-        # inject request parameters as input hidden for fields not part of the layout
-        if creation and request is not None:
-            for field_id in fieldids_not_in_layout:
-                if request.has_key(field_id):
-                    # Handle records
-                    value = request.get(field_id, '')
-                    if isinstance(value, HTTPRequest.record):
-                        for key in value:
-                            html_content = (
-                                "<input type='hidden' "
-                                "name='%s.%s:record' "
-                                "value='%s' />%s" % (
-                                    field_id,
-                                    key,
-                                    asUnicode(value[key]),
-                                    html_content)
-                            )
-                    # And lists
-                    elif isinstance(value, list):
-                        for item in value:
-                            html_content = (
-                                "<input type='hidden' "
-                                "name='%s' "
-                                "value='%s' />%s" % (
-                                    field_id,
-                                    asUnicode(item),
-                                    html_content)
-                            )
-                    else:
-                        html_content = (
-                            "<input type='hidden' "
-                            "name='%s' "
-                            "value='%s' />%s" % (
-                                field_id,
-                                asUnicode(value),
-                                html_content)
-                            )
-
         # evaluate cache formulae and insert already cached fragment
         (html_content, to_be_cached) = self.applyCache(html_content, doc)
 
@@ -1042,6 +1004,49 @@ class PlominoForm(ATFolder):
                         subformname,
                         subformrendering)
 
+        # inject request parameters as input hidden for fields not part of the layout
+        if creation and request is not None and not parent_form_id:
+            field_ids = [f.id for f in self.getFormFields(doc=doc, request=request, includesubforms=True)]
+            # Iterate through the current request
+            for field_id in request.form:
+                # If the value is one of the fields
+                if field_id in field_ids:
+                    # Check to see if there's something already in the form
+                    if pq(html_content).find('[name="%s"]' % field_id).size() == 0:
+                        # Handle records
+                        value = request.get(field_id, '')
+                        if isinstance(value, HTTPRequest.record):
+                            for key in value:
+                                html_content = (
+                                    "<input type='hidden' "
+                                    "name='%s.%s:record' "
+                                    "value='%s' />%s" % (
+                                        field_id,
+                                        key,
+                                        asUnicode(value[key]),
+                                        html_content)
+                                )
+                        # And lists
+                        elif isinstance(value, list):
+                            for item in value:
+                                html_content = (
+                                    "<input type='hidden' "
+                                    "name='%s' "
+                                    "value='%s' />%s" % (
+                                        field_id,
+                                        asUnicode(item),
+                                        html_content)
+                                )
+                        else:
+                            html_content = (
+                                "<input type='hidden' "
+                                "name='%s' "
+                                "value='%s' />%s" % (
+                                    field_id,
+                                    asUnicode(value),
+                                    html_content)
+                                )
+
         #
         # insert the actions
         #
@@ -1071,19 +1076,6 @@ class PlominoForm(ATFolder):
                 else:
                     action_render = ''
                 html_content = html_content.replace(action_span, action_render)
-
-        # If on the parent form, clean up the hidden inputs
-        if not parent_form_id:
-            to_replace = []
-            html = pq(html_content)
-            hidden_inputs = html('input[type="hidden"]')
-            for hidden_input in hidden_inputs:
-                name = hidden_input.name
-                if html('input[name="%s"]' % name).size() > 1:
-                    to_replace.append(pq(hidden_input).outer_html())
-
-            for item in to_replace:
-                html_content = html_content.replace(item, '')
 
         # translation
         html_content = translate(self, html_content)
