@@ -264,6 +264,17 @@ schema = Schema((
             i18n_domain='CMFPlomino',
         ),
     ),
+    BooleanField(
+        name='isMulti',
+        default=False,
+        widget=BooleanField._properties['widget'](
+            label="Multi page form",
+            description="Split the form into pages",
+            label_msgid=_('CMFPlomino_label_MultiPage', default="Multi page form"),
+            description_msgid=_('CMFPlomino_help_MultiPage', default="Split the form into pages"),
+            i18n_domain='CMFPlomino',
+        ),
+    ),
     StringField(
         name='SearchView',
         widget=SelectionWidget(
@@ -364,6 +375,9 @@ class PlominoForm(ATFolder):
             else:
                 return 'POST'
         return value
+
+    def getIsMulti(self):
+        return getattr(self, 'isMulti', False)
 
     def _get_resource_urls(self, field_name):
         """ Return canonicalized URLs if local.
@@ -712,7 +726,6 @@ class PlominoForm(ATFolder):
 
             # my own wrap method
             if grouping:
-                #import pdb; pdb.set_trace()
                 try:
                     ng = pq(grouping).insert_before(pq(togroup).eq(0))
                     pq(ng).append(pq(togroup))
@@ -903,13 +916,42 @@ class PlominoForm(ATFolder):
                 'fields': ''.join(field_items)
                 }
 
+    def _get_current_page(self):
+        request = getattr(self, 'REQUEST', None)
+        try:
+            current_page = int(request.get('plomino_current_page', 0))
+        except:
+            current_page = 0
+        return current_page
+
     security.declarePrivate('_get_html_content')
     def _get_html_content(self):
         plone_tools = getToolByName(self, 'plone_utils')
         encoding = plone_tools.getSiteEncoding()
         layout = self.getField('FormLayout')
         html_content = layout.getRaw(self).decode(encoding)
-        return html_content.replace('\n', '')
+        html_content = html_content.replace('\r\n', '')
+        html_content = html_content.replace('\n', '')
+        if self.getIsMulti():
+            html = pq(html_content)
+            # Remove any accordion headers
+            html.remove('h3.plomino-accordion-header')
+
+            # Hide anything not on the current page
+            current_page = self._get_current_page()
+
+            # Replace the accordions with hidewhens based on the page
+            for i, element in enumerate(html('.plomino-accordion-content')):
+                page = pq(element)
+                page.removeClass('plomino-accordion-content')
+                page.addClass('multipage')
+                page.addClass('hidewhen-multipage-%s' % i)
+                if i != current_page:
+                    page.hide()
+
+            html_content = html.html()
+
+        return html_content
 
     security.declareProtected(READ_PERMISSION, 'applyHideWhen')
     def applyHideWhen(self, doc=None, silent_error=True):
@@ -977,6 +1019,16 @@ class PlominoForm(ATFolder):
                 else:
                     html_content = html_content.replace(start, '')
                     html_content = html_content.replace(end, '')
+
+            if self.getIsMulti():
+                # Remove anything that isn't the current page
+                current_page = self._get_current_page()
+                html = pq(html_content)
+                for el in html('.multipage'):
+                    page = pq(el)
+                    if not page.hasClass('hidewhen-multipage-%s' % current_page):
+                        page.remove()
+                html_content = html.html() 
 
         return html_content
 
@@ -1091,6 +1143,8 @@ class PlominoForm(ATFolder):
                 continue
             hidewhens += form.getHidewhenFormulas()
 
+        result['hidewhen-multipage-0'] = True
+        result['hidewhen-multipage-1'] = False
 
         for hidewhen in hidewhens:
             if hidewhen.id in result:
@@ -1573,6 +1627,7 @@ class PlominoForm(ATFolder):
         """
         """
         db = self.getParentDatabase()
+        # import pdb; pdb.set_trace( )
         tmp = getTemporaryDocument(
                 db,
                 self,
