@@ -38,6 +38,7 @@ from Products.PythonScripts.PythonScript import PythonScript
 from zipfile import ZipFile, ZIP_DEFLATED
 from zope.component import getUtility
 from zope.dottedname.resolve import resolve
+from zope.interface import alsoProvides
 from zope import component
 from ZPublisher.HTTPRequest import FileUpload
 from ZPublisher.HTTPRequest import HTTPRequest
@@ -79,6 +80,9 @@ from Products.CMFPlomino.PlominoForm import schema as form_schema
 from Products.CMFPlomino.PlominoHidewhen import schema as hidewhen_schema
 from Products.CMFPlomino.PlominoView import schema as view_schema
 from Products.CMFPlomino import get_resource_directory
+
+# Backport CSRF fix
+from plone.protect.interfaces import IDisableCSRFProtection
 
 import simplejson as json
 
@@ -688,6 +692,10 @@ class PlominoDesignManager(Persistent):
 
     security.declarePublic('compileFormulaScript')
     def compileFormulaScript(self, script_id, formula, with_args=False):
+        # disable CSRF to allow script saving
+        if hasattr(self, "REQUEST"):
+            alsoProvides(self.REQUEST, IDisableCSRFProtection)
+
         # Remember the current user
         member = self.getCurrentMember()
         if member.__class__.__name__ == "SpecialUser":
