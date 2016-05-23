@@ -339,6 +339,7 @@ label_re =  re.compile('<span class="plominoLabelClass">((?P<optional_fieldname>
 # Not bothering with Legend for now. Label will generate a fieldset and legend for CHECKBOX and RADIO widgets.
 # legend_re = re.compile('<span class="plominoLegendClass">((?P<optional_fieldname>\S+):){0,1}\s*(?P<fieldname_or_label>.+)</span>')
 
+
 class PlominoForm(ATFolder):
     """
     """
@@ -376,6 +377,12 @@ class PlominoForm(ATFolder):
                 return 'POST'
         return value
 
+    def getFormAction(self):
+        """ For a multi page form, submit to a custom action """
+        if self.getIsMulti():
+            return 'openMultipage'
+        return 'createDocument'
+
     def getIsMulti(self):
         return getattr(self, 'isMulti', False)
 
@@ -407,6 +414,74 @@ class PlominoForm(ATFolder):
 
     def get_resources_js(self):
         return self._get_resource_urls('ResourcesJS')
+
+    def _get_next_page(self, REQUEST, action='continue'):
+        # Get the next page number, moving forwards or backwards through the form
+        current_page = self._get_current_page()
+        num_pages = self._get_num_pages()
+        page = current_page
+
+        # Create a temp doc and calculate hidewhens
+        db = self.getParentDatabase()
+        tmp = getTemporaryDocument(db, self, REQUEST, validation_mode=True).__of__(db)
+        html = pq(self.applyHideWhen(tmp))
+
+        has_content = False
+
+        while not has_content:
+            if action == 'continue':
+                page = page + 1
+            else:
+                page = page - 1
+
+            # If we've reached the bounds, return
+            if (page == 0) or page == (num_pages - 1):
+                return page
+
+            new_page = html('div.hidewhen-hidewhen-multipage-%s' % page)
+            # Get inside the .multipage div
+            # XXX: This only works if the hidewhen is in the parent form
+            children = new_page.children().children()
+            for child in children:
+                if pq(child).attr('style') == 'display: none':
+                    continue
+                if pq(child).text():
+                    has_content = True
+                    break
+
+        return page
+
+    def openMultipage(self, REQUEST):
+        """ Handle multipage """
+
+        # On first open, return the form:
+        if not REQUEST.form:
+            return self.OpenForm(request=REQUEST)
+
+        # Get multi page information
+        current_page = self._get_current_page()
+        num_pages = self._get_num_pages()
+
+        errors = self.validateInputs(REQUEST)
+
+        # If back is in the form, page backwards
+        if 'back' in REQUEST.form:
+            REQUEST['plomino_current_page'] = self._get_next_page(REQUEST, action='back')
+            return self.OpenForm(request=REQUEST)
+
+        # We can't continue if there are error:
+        if errors:
+            # XXX: inject these
+            return self.OpenForm(request=REQUEST, page_errors=errors)
+
+        # If next or continue is the form, page forwards if the form is valid
+        if 'next' in REQUEST.form or 'continue' in REQUEST.form:
+            if current_page < (num_pages - 1):
+                REQUEST['plomino_current_page'] = self._get_next_page(REQUEST, action='continue')
+                return self.OpenForm(request=REQUEST)
+
+        # Otherwise create the document
+        return self.createDocument(REQUEST)
 
     security.declareProtected(READ_PERMISSION, 'createDocument')
     def createDocument(self, REQUEST):
@@ -568,6 +643,7 @@ class PlominoForm(ATFolder):
                     filtered.append((action, self.id))
             else:
                 filtered.append((action, self.id))
+
         return filtered
 
     security.declarePublic('getCacheFormulas')
@@ -924,6 +1000,11 @@ class PlominoForm(ATFolder):
             current_page = 0
         return current_page
 
+    def _get_num_pages(self):
+        html_content = self._get_html_content()
+        html = pq(html_content)
+        return html('.multipage').size()
+
     security.declarePrivate('_get_html_content')
     def _get_html_content(self):
         plone_tools = getToolByName(self, 'plone_utils')
@@ -934,20 +1015,35 @@ class PlominoForm(ATFolder):
         html_content = html_content.replace('\n', '')
         if self.getIsMulti():
             html = pq(html_content)
+
             # Remove any accordion headers
             html.remove('h3.plomino-accordion-header')
 
             # Hide anything not on the current page
             current_page = self._get_current_page()
 
+            # Inject a hidden input with the current_page
+            html.append('<input type="hidden" name="plomino_current_page" value="%s" />' % current_page)
+
             # Replace the accordions with hidewhens based on the page
             for i, element in enumerate(html('.plomino-accordion-content')):
                 page = pq(element)
-                page.removeClass('plomino-accordion-content')
                 page.addClass('multipage')
-                page.addClass('hidewhen-multipage-%s' % i)
-                if i != current_page:
-                    page.hide()
+                page.removeClass('plomino-accordion-content')
+                page.before('<span class="plominoHidewhenClass">start:hidewhen-multipage-%s</span>' % i)
+                page.after('<span class="plominoHidewhenClass">end:hidewhen-multipage-%s</span>' % i)
+
+            # Work out how many pages we have
+            num_pages = html('.multipage').size()
+
+            # Add back/continue buttons to the end of the form
+            paging = pq('<div id="plomino_page_actions"></div>')
+
+            if current_page > 0:
+                paging.append('<input type="submit" name="back" value="Back" />')
+            if current_page < (num_pages - 1):
+                paging.append('<input type="submit" name="continue" value="Continue" />')
+            html.append(paging)
 
             html_content = html.html()
 
@@ -1020,15 +1116,36 @@ class PlominoForm(ATFolder):
                     html_content = html_content.replace(start, '')
                     html_content = html_content.replace(end, '')
 
-            if self.getIsMulti():
-                # Remove anything that isn't the current page
-                current_page = self._get_current_page()
-                html = pq(html_content)
-                for el in html('.multipage'):
-                    page = pq(el)
-                    if not page.hasClass('hidewhen-multipage-%s' % current_page):
-                        page.remove()
-                html_content = html.html() 
+        # Handle multi page hidewhens
+        num_pages = self._get_num_pages()
+        current_page = self._get_current_page()
+        for page in xrange(num_pages):
+            hidewhenName = 'hidewhen-multipage-%s' % page
+            if page == current_page:
+                hidden = False
+            else:
+                hidden = True
+
+            start = ('<span class="plominoHidewhenClass">start:%s</span>' % hidewhenName)
+            end = ('<span class="plominoHidewhenClass">end:%s</span>' % hidewhenName)
+
+            if hidden:
+                style = ' style="display: none"'
+            else:
+                style = ''
+
+            html_content = re.sub(
+                start,
+                '<div class="hidewhen-%s"%s>' % (
+                    hidewhenName,
+                    style),
+                html_content,
+                re.MULTILINE + re.DOTALL)
+            html_content = re.sub(
+                end,
+                '</div>',
+                html_content,
+                re.MULTILINE + re.DOTALL)
 
         return html_content
 
@@ -1143,8 +1260,15 @@ class PlominoForm(ATFolder):
                 continue
             hidewhens += form.getHidewhenFormulas()
 
-        result['hidewhen-multipage-0'] = True
-        result['hidewhen-multipage-1'] = False
+        # Set hidewhen values for multipage based on current page
+        num_pages = self._get_num_pages()
+        current_page = self._get_current_page()
+        for page in xrange(num_pages):
+            if page == current_page:
+                result['hidewhen-multipage-%s' % page] = False
+            else:
+                # All other pages are hidden
+                result['hidewhen-multipage-%s' % page] = True
 
         for hidewhen in hidewhens:
             if hidewhen.id in result:
@@ -1273,7 +1397,8 @@ class PlominoForm(ATFolder):
             tmp = getTemporaryDocument(
                     db,
                     self,
-                    self.REQUEST).__of__(db)
+                    self.REQUEST,
+                    validation_mode=True).__of__(db)
         if (not invalid) or self.hasDesignPermission(self):
             editmode=True
             form_mode = request.get('plomino_form_mode')
@@ -1368,7 +1493,8 @@ class PlominoForm(ATFolder):
             tmp = getTemporaryDocument(
                     db,
                     self,
-                    self.REQUEST).__of__(db)
+                    self.REQUEST,
+                    validation_mode=True).__of__(db)
         fields = self.getFormFields(
                 includesubforms=True,
                 doc=tmp,
@@ -1554,7 +1680,12 @@ class PlominoForm(ATFolder):
     def validation_errors(self, REQUEST):
         """ Check submitted values
         """
-        errors = self.validateInputs(REQUEST)
+        # For a multi page form, don't validate if moving backwards
+        if self.getIsMulti() and REQUEST.get('plomino_clicked_name') == 'back':
+            errors = []
+        else:
+            errors = self.validateInputs(REQUEST)
+
         if errors:
             return self.errors_json(
                     errors=json.dumps({'success': False, 'errors': errors}))
@@ -1627,7 +1758,6 @@ class PlominoForm(ATFolder):
         """
         """
         db = self.getParentDatabase()
-        # import pdb; pdb.set_trace( )
         tmp = getTemporaryDocument(
                 db,
                 self,

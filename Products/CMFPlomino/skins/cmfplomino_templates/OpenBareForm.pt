@@ -6,6 +6,7 @@
       i18n:domain="plone"
       tal:define="form python:here;
                   form_method python:form.getFormMethod();
+                  form_action python:form.getFormAction();
                   "
       >
 <head tal:define="view context/@@plone;
@@ -92,7 +93,7 @@ jQuery(document).ready( function() {
                         "
                 tal:attributes="
                         name form/id;
-                        action string:${form/absolute_url}/createDocument;
+                        action string:${form/absolute_url}/${form_action};
                         method form_method;
                         enctype enctype|nothing
                         "

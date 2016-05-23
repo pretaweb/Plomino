@@ -97,6 +97,7 @@ jQuery(document).ready( function() {
                 templateId template/getId;
                 form python:here;
                 form_method python:form.getFormMethod();
+                form_action python:form.getFormAction();
                 ">
         <tal:block_page
         define="b form/ActionBarPosition|nothing;
@@ -113,7 +114,7 @@ jQuery(document).ready( function() {
                             "
                     tal:attributes="
                             name form/id;
-                            action string:${form/absolute_url}/createDocument;
+                            action string:${form/absolute_url}/${form_action};
                             method form_method;
                             enctype enctype|nothing
                             "
@@ -160,7 +161,20 @@ jQuery(document).ready( function() {
                                 name="plominoredirecturl"
                                 tal:attributes="value here/REQUEST/plominoredirecturl|nothing" />
                         </tal:redirecturl>
-                        <span tal:content="structure python:here.openBlankForm(request)" /> 
+
+                        <tal:block condition="options/page_errors|nothing">
+                            <div id="validation_failed">
+                                <h1>Validation failed</h1>
+                                <ul id="error_list">
+                                    <tal:errors repeat="e options/page_errors">
+                                        <li tal:content="structure e/error"
+                                            tal:attributes="id string:error_${e/field}" />
+                                    </tal:errors>
+                                </ul>
+                            </div>
+                        </tal:block>
+
+                        <span tal:content="structure python:here.openBlankForm(request)" />
                         <tal:block_actionbar_bottom
                             define="owner python:form"
                             condition="python:b and form.ActionBarPosition in ['BOTTOM', 'BOTH']">
