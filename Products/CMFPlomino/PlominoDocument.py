@@ -399,7 +399,7 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
 
         if not REQUEST.form:
             # If the current page has been set, update the REQUEST
-            page = getattr(self, 'plomino_current_page')
+            page = getattr(self, 'plomino_current_page', None)
             if page:
                 REQUEST['plomino_current_page'] = page
             return self.EditDocument(request=REQUEST)
