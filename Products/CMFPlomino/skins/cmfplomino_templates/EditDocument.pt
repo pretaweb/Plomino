@@ -117,11 +117,12 @@ jQuery(document).ready( function() {
         <form 
             tal:define="
                     form_method python:form.getFormMethod();
+                    form_action python:here.getFormAction();
                     enctype python:(form_method == 'POST') and 'multipart/form-data'
                     "
             tal:attributes="
                     name form/id;
-                    action python:here.doc_url()+'/saveDocument';
+                    action python:here.doc_url()+'/'+form_action;
                     method form_method;
                     enctype enctype|nothing
                     "
@@ -140,6 +141,18 @@ jQuery(document).ready( function() {
                 <h1 class="documentFirstHeading" tal:content="here/Title">Title</h1>
                 <div tal:replace="structure provider:plone.belowcontenttitle" />
                 <div tal:replace="structure provider:plone.abovecontentbody" />
+
+                <tal:block condition="options/page_errors|nothing">
+                    <div id="validation_failed">
+                        <h1>Validation failed</h1>
+                        <ul id="error_list">
+                            <tal:errors repeat="e options/page_errors">
+                                <li tal:content="structure e/error"
+                                    tal:attributes="id string:error_${e/field}" />
+                            </tal:errors>
+                        </ul>
+                    </div>
+                </tal:block>
                 <span tal:content="structure python:here.editWithForm(form)" />
 
                 <tal:form_actions_bottom

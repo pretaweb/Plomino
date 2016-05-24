@@ -386,6 +386,89 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
             return self.errors_json(
                     errors=json.dumps({'success': True}))
 
+    def getFormAction(self):
+        """ For a multi page form, submit to a custom action """
+        form = self.getForm()
+        if form.getIsMulti():
+            return 'saveMultipage'
+        return 'saveDocument'
+
+    security.declareProtected(EDIT_PERMISSION, 'saveMultipage')    
+    def saveMultipage(self, REQUEST):
+        """ Handle saving of multipage """
+
+        if not REQUEST.form:
+            # If the current page has been set, update the REQUEST
+            page = getattr(self, 'plomino_current_page')
+            if page:
+                REQUEST['plomino_current_page'] = page
+            return self.EditDocument(request=REQUEST)
+
+        db = self.getParentDatabase()
+        form = db.getForm(REQUEST.get('Form'))
+
+        errors = form.validateInputs(REQUEST, doc=self)
+
+        current_page = form._get_current_page()
+        num_pages = form._get_num_pages()
+
+        # If back is in the form, page backwards
+        if 'back' in REQUEST.form:
+            next_page = form._get_next_page(REQUEST, action='back')
+            REQUEST['plomino_current_page'] = next_page
+            # Update the forms current page
+            setattr(self, 'plomino_current_page', next_page)
+            return self.EditDocument(request=REQUEST)
+
+        # We can't continue if there are errors
+        if errors:
+            # inject these into the form
+            return self.EditDocument(request=REQUEST, page_errors=errors)
+
+        # Any buttons progress the user through the form
+        if current_page < (num_pages - 1):
+            next_page = form._get_next_page(REQUEST, action='continue')
+            REQUEST['plomino_current_page'] = next_page
+            # Update the forms current page
+            setattr(self, 'plomino_current_page', next_page)
+
+        # execute the beforeSave code of the form
+        error = None
+        try:
+            error = self.runFormulaScript(
+                    SCRIPT_ID_DELIMITER.join(['form', form.id, 'beforesave']),
+                    self,
+                    form.getBeforeSaveDocument)
+        except PlominoScriptException, e:
+            e.reportError('Form submitted, but beforeSave formula failed')
+
+        if error:
+            errors.append({'field': 'beforeSave', 'error': error})
+            # Backtrack the page
+            REQUEST['plomino_current_page'] = current_page
+            return self.EditDocument(request=REQUEST, page_errors=errors)
+
+        # Now save and move forwards
+        self.setItem('Form', form.getFormName())
+
+        # process editable fields (we read the submitted value in the request)
+        form.readInputs(self, REQUEST, process_attachments=True)
+
+        # refresh computed values, run onSave, reindex. Should never be creation.
+        self.save(form, False)
+
+        # If there is a redirect, redirect to it:
+        redirect = REQUEST.get('plominoredirecturl')
+        if not redirect:
+            redirect = self.getItem("plominoredirecturl")
+
+        if redirect:
+            REQUEST.RESPONSE.redirect(redirect)
+            return
+
+        # Otherwise continue through the document
+        return self.EditDocument(REQUEST)
+
     security.declareProtected(EDIT_PERMISSION, 'saveDocument')
     def saveDocument(self, REQUEST, creation=False):
         """ Save a document using the form submitted content

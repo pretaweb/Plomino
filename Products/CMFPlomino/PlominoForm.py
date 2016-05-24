@@ -451,6 +451,7 @@ class PlominoForm(ATFolder):
 
         return page
 
+    security.declareProtected(READ_PERMISSION, 'openMultipage')
     def openMultipage(self, REQUEST):
         """ Handle multipage """
 
@@ -471,7 +472,7 @@ class PlominoForm(ATFolder):
 
         # We can't continue if there are error:
         if errors:
-            # XXX: inject these
+            # inject these into the form
             return self.OpenForm(request=REQUEST, page_errors=errors)
 
         # If next or continue is the form, page forwards if the form is valid
