@@ -1162,7 +1162,7 @@ class PlominoForm(ATFolder):
     security.declareProtected(READ_PERMISSION, 'hasDynamicFields')
     def hasDynamicFields(self):
         """ Search for computed display fields """
-        fields = self.getFormFields()
+        fields = self.getFormFields(includesubforms=True)
         for field in fields:
             if getattr(field, 'isDynamicField', False):
                 return True
@@ -1225,7 +1225,8 @@ class PlominoForm(ATFolder):
                 doc
             )
         result = {}
-        fields = self.getFormFields()
+        fields = self.getFormFields(includesubforms=True, doc=doc)
+
         dynamic = [f for f in fields if getattr(f, 'isDynamicField', False)]
         for field in dynamic:
             # For now, only handle dynamic computed fields
