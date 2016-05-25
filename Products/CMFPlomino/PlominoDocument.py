@@ -415,10 +415,13 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
         # If back is in the form, page backwards
         if 'back' in REQUEST.form:
             next_page = form._get_next_page(REQUEST, action='back')
-            REQUEST['plomino_current_page'] = next_page
+
             # Update the forms current page
             setattr(self, 'plomino_current_page', next_page)
-            return self.EditDocument(request=REQUEST)
+
+            # Redirect back to the form
+            REQUEST.RESPONSE.redirect(REQUEST['URL'])
+            return
 
         # We can't continue if there are errors
         if errors:
@@ -467,7 +470,9 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
             return
 
         # Otherwise continue through the document
-        return self.EditDocument(REQUEST)
+        # Redirect back to the form
+        REQUEST.RESPONSE.redirect(REQUEST['URL'])
+        return
 
     security.declareProtected(EDIT_PERMISSION, 'saveDocument')
     def saveDocument(self, REQUEST, creation=False):
