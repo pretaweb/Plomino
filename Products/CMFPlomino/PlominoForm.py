@@ -828,9 +828,22 @@ class PlominoForm(ATFolder):
             parent_form_id=False, request=None):
         """ Display the document using the form's layout
         """
+        db = self.getParentDatabase()
+
+        if parent_form_id:
+            parent_form = db.getForm(parent_form_id)
+            is_multi = parent_form.getIsMulti()
+        else:
+            is_multi = self.getIsMulti()
+
+        # Use the request for the temp doc in editmode with a multipage form
+        if editmode and request.form and is_multi:
+            use_request = True
+        else:
+            use_request = False
+
         # Create a temp doc to work with
-        if doc is None:
-            db = self.getParentDatabase()
+        if doc is None or use_request:
             temp_doc = getTemporaryDocument(
                 db,
                 self,
