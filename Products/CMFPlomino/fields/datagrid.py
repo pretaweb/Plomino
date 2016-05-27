@@ -332,6 +332,7 @@ class DatagridField(BaseField):
 
         rawValue = fieldValue
 
+        #TODO: get default field_mapping
         mapped_fields = []
         if self.field_mapping:
             mapped_fields = [
@@ -339,60 +340,71 @@ class DatagridField(BaseField):
         # item names is set by `PlominoForm.createDocument`
         item_names = doc.getItem(self.context.id+'_itemnames')
 
-        if mapped_fields:
-            if not item_names:
-                item_names = mapped_fields
+        if not mapped_fields:
+            # rows are lists of values in order of mapped_fields.
+            return {'rawdata': rawValue, 'rendered': fieldValue}
 
-            # fieldValue is a array, where we must replace raw values with
-            # rendered values
-            child_form_id = self.associated_form
-            if child_form_id:
-                db = self.context.getParentDatabase()
-                child_form = db.getForm(child_form_id)
-                # zip is procrustean: we get the longest of mapped_fields or
-                # fieldValue
-                mapped = []
-                for row in fieldValue:
-                    if len(row) < len(item_names):
-                        row = (row + ['']*(len(item_names)-len(row)))
-                    row = dict(zip(item_names, row))
-                    mapped.append(row)
-                fieldValue = mapped
-                fields = {}
-                for f in mapped_fields + item_names:
-                    fields[f] = None
-                fields = fields.keys()
-                field_objs = [child_form.getFormField(f) for f in fields]
-                # avoid bad field ids
-                field_objs = [f for f in field_objs if f is not None]
-                #DBG fields_to_render = [f.id for f in field_objs if f.getFieldType() not in ["DATETIME", "NUMBER", "TEXT", "RICHTEXT"]]
-                #DBG fields_to_render = [f.id for f in field_objs if f.getFieldType() not in ["DOCLINK", ]]
-                fields_to_render = [f.id for f in field_objs 
-                        if f.getFieldMode() in ["DISPLAY", ] or 
-                        f.getFieldType() not in ["TEXT", "RICHTEXT"]]
+        if not item_names:
+            item_names = mapped_fields
 
-                if fields_to_render:
-                    rendered_values = []
-                    for row in fieldValue:
-                        row['Form'] = child_form_id
-                        row['Plomino_Parent_Document'] = doc.id 
-                        # We want a new TemporaryDocument for every row
-                        tmp = TemporaryDocument(
-                                db, child_form, row, real_doc=doc)
-                        tmp = tmp.__of__(db)
-                        for f in fields:
-                            if f in fields_to_render:
-                                row[f] = tmp.getRenderedItem(f)
-                        rendered_values.append(row)
-                    fieldValue = rendered_values
+        # fieldValue is a array, where we must replace raw values with
+        # rendered values
+        child_form_id = self.associated_form
+        if child_form_id:
+            db = self.context.getParentDatabase()
+            child_form = db.getForm(child_form_id)
+            # zip is procrustean: we get the longest of mapped_fields or
+            # fieldValue
+            mapped = []
+            for row in fieldValue:
+                if len(row) < len(item_names):
+                    row = (row + ['']*(len(item_names)-len(row)))
+                row = dict(zip(item_names, row))
+                mapped.append(row)
+            fieldValue = mapped
+            fields = {}
+            for f in mapped_fields + item_names:
+                fields[f] = None
+            fields = fields.keys()
+            field_objs = [child_form.getFormField(f) for f in fields]
+            # avoid bad field ids
+            field_objs = [f for f in field_objs if f is not None]
 
 
+            #DBG fields_to_render = [f.id for f in field_objs if f.getFieldType() not in ["DATETIME", "NUMBER", "TEXT", "RICHTEXT"]]
+            #DBG fields_to_render = [f.id for f in field_objs if f.getFieldType() not in ["DOCLINK", ]]
+            fields_to_render = [f.id for f in field_objs
+                    if f.getFieldMode() in ["DISPLAY", ] or
+                    f.getFieldType() not in ["TEXT", "RICHTEXT"]]
 
-            if mapped_fields and child_form_id:
-                mapped = []
-                for row in fieldValue:
-                    mapped.append([row[c] for c in mapped_fields])
-                fieldValue = mapped
+            rendered_values = []
+            calc_value = []
+            for row in fieldValue:
+                row['Form'] = child_form_id
+                row['Plomino_Parent_Document'] = doc.id
+                # We want a new TemporaryDocument for every row
+                tmp = TemporaryDocument(
+                        db, child_form, row, real_doc=doc)
+                tmp = tmp.__of__(db)
+                calc_row = {}
+                for f,fobj in zip(fields,field_objs):
+                    calc_row[f] = fobj.getSettings().getFieldValue(
+                        child_form,
+                        doc=tmp,
+                        editmode_obsolete=False,
+                        creation=creation,
+                        request=None)
+                    if f in fields_to_render:
+                        row[f] = tmp.getRenderedItem(f)
+                rendered_values.append(row)
+                calc_value.append(calc_row)
+            fieldValue = rendered_values
+
+
+
+        if child_form_id:
+            rawValue = [[row[c] for c in mapped_fields] for row in calc_value]
+            fieldValue = [[row[c] for c in mapped_fields] for row in fieldValue]
 
         # rows are lists of values in order of mapped_fields.
         #TODO: should still return a value when mapped_fields is empty
