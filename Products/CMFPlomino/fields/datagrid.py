@@ -405,7 +405,6 @@ class DatagridField(BaseField):
             fieldValue = rendered_values
 
 
-
         if child_form_id:
             rawValue = [[row[c] for c in mapped_fields] for row in calc_value]
             fieldValue = [[row[c] for c in mapped_fields] for row in fieldValue]
