@@ -373,6 +373,7 @@ class DatagridField(BaseField):
 
             #DBG fields_to_render = [f.id for f in field_objs if f.getFieldType() not in ["DATETIME", "NUMBER", "TEXT", "RICHTEXT"]]
             #DBG fields_to_render = [f.id for f in field_objs if f.getFieldType() not in ["DOCLINK", ]]
+            # Optimisation: only render fields that can change from the raw value
             fields_to_render = [f.id for f in field_objs
                     if f.getFieldMode() in ["DISPLAY", ] or
                     f.getFieldType() not in ["TEXT", "RICHTEXT"]]
@@ -388,6 +389,7 @@ class DatagridField(BaseField):
                 tmp = tmp.__of__(db)
                 calc_row = {}
                 for f,fobj in zip(fields,field_objs):
+                    # this will handle calculated fields
                     calc_row[f] = fobj.getSettings().getFieldValue(
                         child_form,
                         doc=tmp,
@@ -395,7 +397,9 @@ class DatagridField(BaseField):
                         creation=creation,
                         request=None)
                     if f in fields_to_render:
-                        row[f] = tmp.getRenderedItem(f)
+                        row[f] = tmp.getRenderedItem(f, form=child_form)
+                    else:
+                        row[f] = calc_row[f]
                 rendered_values.append(row)
                 calc_value.append(calc_row)
             fieldValue = rendered_values
