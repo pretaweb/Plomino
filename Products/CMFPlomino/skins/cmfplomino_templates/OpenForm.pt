@@ -46,6 +46,11 @@ function refreshDynamicContent() {
 }
 jQuery(document).ready( function() {
     jQuery('#plomino_form :input').change(refreshDynamicContent);
+    if (jQuery('input[name=plomino_current_page]')) {
+        var page = jQuery('input[name=plomino_current_page]').val();
+        var stateObj = {multipage: 'multipage' };
+        history.pushState(stateObj, '', 'page/'+page);
+    };
 });
 ">
     </script>
