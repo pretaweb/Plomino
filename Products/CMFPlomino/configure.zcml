@@ -45,6 +45,21 @@
       class=".isDesignMode"
     />
 
+  <browser:view
+      for="Products.CMFPlomino.interfaces.IPlominoForm"
+      name="page"
+      permission="zope.Public"
+      class=".multipage.PageView"
+      />
+
+    <browser:view
+      for="Products.CMFPlomino.interfaces.IPlominoDocument"
+      name="page"
+      permission="zope.Public"
+      class=".multipage.PageView"
+      />
+
+
   <!-- interfaces moved to zope.container since Plone4.3 /-->
   <subscriber
     zcml:condition="have plone-43"

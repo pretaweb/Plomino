@@ -451,39 +451,6 @@ class PlominoForm(ATFolder):
 
         return page
 
-    security.declareProtected(READ_PERMISSION, 'openMultipage')
-    def openMultipage(self, REQUEST):
-        """ Handle multipage """
-
-        # On first open, return the form:
-        if not REQUEST.form:
-            return self.OpenForm(request=REQUEST)
-
-        # Get multi page information
-        current_page = self._get_current_page()
-        num_pages = self._get_num_pages()
-
-        errors = self.validateInputs(REQUEST)
-
-        # If back is in the form, page backwards
-        if 'back' in REQUEST.form:
-            REQUEST['plomino_current_page'] = self._get_next_page(REQUEST, action='back')
-            return self.OpenForm(request=REQUEST)
-
-        # We can't continue if there are error:
-        if errors:
-            # inject these into the form
-            return self.OpenForm(request=REQUEST, page_errors=errors)
-
-        # If next or continue is the form, page forwards if the form is valid
-        if 'next' in REQUEST.form or 'continue' in REQUEST.form:
-            if current_page < (num_pages - 1):
-                REQUEST['plomino_current_page'] = self._get_next_page(REQUEST, action='continue')
-                return self.OpenForm(request=REQUEST)
-
-        # Otherwise create the document
-        return self.createDocument(REQUEST)
-
     security.declareProtected(READ_PERMISSION, 'createDocument')
     def createDocument(self, REQUEST):
         """ Create a document using the form's submitted content.
