@@ -380,7 +380,7 @@ class PlominoForm(ATFolder):
     def getFormAction(self):
         """ For a multi page form, submit to a custom action """
         if self.getIsMulti():
-            return 'openMultipage'
+            return 'page/%s' % self._get_current_page()
         return 'createDocument'
 
     def getIsMulti(self):

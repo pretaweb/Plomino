@@ -390,7 +390,7 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
         """ For a multi page form, submit to a custom action """
         form = self.getForm()
         if form.getIsMulti():
-            return 'editMultipage'
+            return 'page/%s' % form._get_current_page()
         return 'saveDocument'
 
     security.declareProtected(EDIT_PERMISSION, 'editMultipage')
