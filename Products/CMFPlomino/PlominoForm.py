@@ -435,7 +435,7 @@ class PlominoForm(ATFolder):
                 page = page - 1
 
             # If we've reached the bounds, return
-            if (page == 0) or page == (num_pages - 1):
+            if (page == 1) or page == (num_pages):
                 return page
 
             new_page = html('div.hidewhen-hidewhen-multipage-%s' % page)
@@ -1013,9 +1013,9 @@ class PlominoForm(ATFolder):
     def _get_current_page(self):
         request = getattr(self, 'REQUEST', None)
         try:
-            current_page = int(request.get('plomino_current_page', 0))
+            current_page = int(request.get('plomino_current_page', 1))
         except:
-            current_page = 0
+            current_page = 1
         return current_page
 
     def _get_num_pages(self):
@@ -1044,10 +1044,11 @@ class PlominoForm(ATFolder):
             html.append('<input type="hidden" name="plomino_current_page" value="%s" />' % current_page)
 
             # Replace the accordions with hidewhens based on the page
-            for i, element in enumerate(html('.plomino-accordion-content')):
+            for i, element in enumerate(html('.plomino-accordion-content'), start=1):
                 page = pq(element)
                 page.addClass('multipage')
                 page.removeClass('plomino-accordion-content')
+                # 0-indexed pages are ugly
                 page.before('<span class="plominoHidewhenClass">start:hidewhen-multipage-%s</span>' % i)
                 page.after('<span class="plominoHidewhenClass">end:hidewhen-multipage-%s</span>' % i)
 
@@ -1057,9 +1058,9 @@ class PlominoForm(ATFolder):
             # Add back/continue buttons to the end of the form
             paging = pq('<div id="plomino_page_actions"></div>')
 
-            if current_page > 0:
+            if current_page > 1:
                 paging.append('<input type="submit" name="back" value="Back" />')
-            if current_page < (num_pages - 1):
+            if current_page < (num_pages):
                 paging.append('<input type="submit" name="continue" value="Continue" />')
             html.append(paging)
 
@@ -1137,7 +1138,8 @@ class PlominoForm(ATFolder):
         # Handle multi page hidewhens
         num_pages = self._get_num_pages()
         current_page = self._get_current_page()
-        for page in xrange(num_pages):
+        # 0-indexed pages are ugly
+        for page in xrange(1, num_pages+1):
             hidewhenName = 'hidewhen-multipage-%s' % page
             if page == current_page:
                 hidden = False
@@ -1282,7 +1284,8 @@ class PlominoForm(ATFolder):
         # Set hidewhen values for multipage based on current page
         num_pages = self._get_num_pages()
         current_page = self._get_current_page()
-        for page in xrange(num_pages):
+        # 0-indexed pages are ugly
+        for page in xrange(1, num_pages+1):
             if page == current_page:
                 result['hidewhen-multipage-%s' % page] = False
             else:
