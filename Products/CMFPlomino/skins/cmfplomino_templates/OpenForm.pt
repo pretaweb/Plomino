@@ -46,7 +46,7 @@ function refreshDynamicContent() {
 }
 jQuery(document).ready( function() {
     jQuery('#plomino_form :input').change(refreshDynamicContent);
-    if (jQuery('input[name=plomino_current_page]')) {
+    if (jQuery('input[name=plomino_current_page]').length) {
         var page = jQuery('input[name=plomino_current_page]').val();
         var stateObj = {multipage: 'multipage' };
         history.pushState(stateObj, '', 'page/'+page);
