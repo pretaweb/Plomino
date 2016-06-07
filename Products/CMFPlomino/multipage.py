@@ -99,17 +99,23 @@ class PageView(BrowserView):
                 next_page = form._get_next_page(self.request, action='back')
                 return self.redirect(next_page)
 
+            # Handle linking
+            linkto = False
+            for key in self.request.form.keys():
+                if key.startswith('plominolinkto-'):
+                    linkto = key.replace('plominolinkto-', '')
+                    next_page = form._get_next_page(self.request, action='linkto', target=linkto)
+                    return self.redirect(next_page)
+
             errors = form.validateInputs(self.request)
 
             if errors:
                 return self.context.EditDocument(request=self.request, page_errors=errors)
 
             # Any buttons progress the user through the form
+            # XXX: We need to handle other types of buttons here
             if current_page < (num_pages):
                 next_page = form._get_next_page(self.request, action='continue')
-                #REQUEST['plomino_current_page'] = next_page
-                # Update the forms current page
-                #setattr(self, 'plomino_current_page', next_page)
 
             # execute the beforeSave code of the form
             error = None
@@ -165,6 +171,13 @@ class PageView(BrowserView):
             if 'back' in self.request.form:
                 self.request['plomino_current_page'] = form._get_next_page(self.request, action='back')
                 return form.OpenForm(request=self.request)
+
+            # Handle linking
+            for key in self.request.form.keys():
+                if key.startswith('plominolinkto-'):
+                    linkto = key.replace('plominolinkto-', '')
+                    self.request['plomino_current_page'] = form._get_next_page(self.request, action='linkto', target=linkto)
+                    return form.OpenForm(request=self.request)
 
             errors = form.validateInputs(self.request)
 

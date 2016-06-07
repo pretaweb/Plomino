@@ -415,7 +415,7 @@ class PlominoForm(ATFolder):
     def get_resources_js(self):
         return self._get_resource_urls('ResourcesJS')
 
-    def _get_next_page(self, REQUEST, action='continue'):
+    def _get_next_page(self, REQUEST, action='continue', target=None):
         # Get the next page number, moving forwards or backwards through the form
         current_page = self._get_current_page()
         num_pages = self._get_num_pages()
@@ -426,8 +426,20 @@ class PlominoForm(ATFolder):
         tmp = getTemporaryDocument(db, self, REQUEST, validation_mode=True).__of__(db)
         html = pq(self.applyHideWhen(tmp))
 
-        has_content = False
+        if action == 'linkto':
+            if target is not None:
+                # Iterate through the pages to find the linkto target
+                for page_number, pg_html in enumerate(html('div.multipage'), start=1):
+                    pg = pq(pg_html)
+                    # Look for subforms and fields, then check for the target
+                    for element in pg('.plominoSubformClass, .plominoFieldClass'):
+                        if element.text.split(':')[0] == target:
+                            return page_number
 
+            # If there is no target, or we couldn't find it, return the current page
+            return page
+
+        has_content = False
         while not has_content:
             if action == 'continue':
                 page = page + 1
@@ -1013,9 +1025,9 @@ class PlominoForm(ATFolder):
         html_content = html_content.replace('\r\n', '')
         html_content = html_content.replace('\n', '')
 
-        if self.getIsMulti():
-            html = pq(html_content)
+        html = pq(html_content)
 
+        if self.getIsMulti():
             # Remove any accordion headers
             html.remove('h3.plomino-accordion-header')
 
@@ -1046,7 +1058,24 @@ class PlominoForm(ATFolder):
                 paging.append('<input type="submit" name="continue" value="Continue" />')
             html.append(paging)
 
-            html_content = html.html()
+        # This needs to work outside of multipage for now, in case they're on
+        # a subform.
+        # Handle linkto fields
+        for linkto_node in html("span.plominoLinktoClass"):
+            linkto_text = linkto_node.text.strip()
+            if ':' in linkto_text:
+                fieldname, text = linkto_text.split(':', 1)
+            else:
+                fieldname = linkto_text
+                text = fieldname
+
+            link = '<input class="linkto" type="submit" name="plominolinkto-%s" value="%s" />' % (fieldname, text)
+
+            pq(link).insert_before(pq(linkto_node))
+            # Remove the old node
+            pq(linkto_node).remove()
+
+        html_content = html.html()
 
         return html_content
 
