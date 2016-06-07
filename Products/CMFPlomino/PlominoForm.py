@@ -24,7 +24,6 @@ from jsonutil import jsonutil as json
 # Zope
 from AccessControl import ClassSecurityInfo
 from zope.interface import implements
-from zope.annotation.interfaces import IAnnotations
 
 # CMF / Archetypes / Plone
 from Products.Archetypes.atapi import *
@@ -989,22 +988,19 @@ class PlominoForm(ATFolder):
     def _get_num_pages(self):
         # Cache the number of pages so we don't have to parse the HTML
         # more than once per request
-        request = getattr(self, 'REQUEST', None)
-        key = 'cached-num-pages'
-        if request:
-            cache = IAnnotations(request)
-            data = cache.get(key, None)
-            if data is not None:
-                return data
+        db = self.getParentDatabase()
+        cache_key = 'cached-num-pages'
+
+        cached = db.getRequestCache(cache_key)
+        if cached is not None:
+            return cached
 
         html_content = self._get_html_content()
         html = pq(html_content)
         pages = html('.multipage').size()
 
         # Cache the result
-        if request:
-            cache = IAnnotations(request)
-            cache[key] = pages
+        db.setRequestCache(cache_key, pages)
 
         return pages
 
