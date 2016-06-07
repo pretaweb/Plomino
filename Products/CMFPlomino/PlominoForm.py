@@ -1009,23 +1009,7 @@ class PlominoForm(ATFolder):
         return pages
 
     security.declarePrivate('_get_html_content')
-    def _get_html_content(self, cache_key=None):
-        # Cache the html content if possible
-        request = getattr(self, 'REQUEST', None)
-        if cache_key is None:
-            key = 'cached-html-content-' + self.UID()
-        else:
-            key = 'cached-html-content-' + cache_key
-
-        if request and 0:
-            # Return cached data
-            cache = IAnnotations(request)
-            data = cache.get(key, None)
-            if data is not None:
-                return data
-
-        # import pdb; pdb.set_trace( )
-        #print "In _get_html_content %s" % self.Title()
+    def _get_html_content(self):
         plone_tools = getToolByName(self, 'plone_utils')
         encoding = plone_tools.getSiteEncoding()
         layout = self.getField('FormLayout')
@@ -1067,10 +1051,6 @@ class PlominoForm(ATFolder):
             html.append(paging)
 
             html_content = html.html()
-
-        # Cache the html
-        if request and 0:
-            cache[key] = html_content
 
         return html_content
 
