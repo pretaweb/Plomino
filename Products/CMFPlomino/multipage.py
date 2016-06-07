@@ -5,6 +5,13 @@ from Products.Five.browser.pagetemplatefile import ViewPageTemplateFile
 from zope.publisher.interfaces import IPublishTraverse
 from zope.interface import implementer
 
+ACTIONS = (
+    'validation_errors',
+    'tojson',
+    'statusmessage_load',
+    'computedynamiccontent',
+)
+
 
 @implementer(IPublishTraverse)
 class PageView(BrowserView):
@@ -20,11 +27,13 @@ class PageView(BrowserView):
         capture it here on initialization
         """
         super(PageView, self).__init__(context, request)
+
         # Certain URLs should be handled outside paging
-        if request.path and request.path[-1] == 'validation_errors':
-            self.validation = True
-        else:
-            self.validation = False
+        # XXX: Do this better
+        self.action = None
+        if request.path:
+            if request.path[-1] in ACTIONS:
+                self.action = request.path[-1]
 
         # Default page is page 1
         self.page = 1
@@ -39,8 +48,16 @@ class PageView(BrowserView):
         # Check permissions here?
         self.checkPermission()
 
-        if self.validation:
-            return self.context.validation_errors(self.request)
+        # XXX: do this better
+        if self.action:
+            if self.action == 'validation_errors':
+                return self.context.validation_errors(self.request)
+            elif self.action == 'tojson':
+                return self.context.tojson(self.request)
+            elif self.action == 'statusmessage_load':
+                return self.context.statusmessage_load(self.request)
+            elif self.action == 'computedynamiccontent':
+                return self.context.computedynamiccontent(self.request)
 
         # Set the current page
         self.request['plomino_current_page'] = self.page

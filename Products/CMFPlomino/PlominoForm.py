@@ -24,6 +24,7 @@ from jsonutil import jsonutil as json
 # Zope
 from AccessControl import ClassSecurityInfo
 from zope.interface import implements
+from zope.annotation.interfaces import IAnnotations
 
 # CMF / Archetypes / Plone
 from Products.Archetypes.atapi import *
@@ -986,18 +987,52 @@ class PlominoForm(ATFolder):
         return current_page
 
     def _get_num_pages(self):
+        # Cache the number of pages so we don't have to parse the HTML
+        # more than once per request
+        request = getattr(self, 'REQUEST', None)
+        key = 'cached-num-pages'
+        if request:
+            cache = IAnnotations(request)
+            data = cache.get(key, None)
+            if data is not None:
+                return data
+
         html_content = self._get_html_content()
         html = pq(html_content)
-        return html('.multipage').size()
+        pages = html('.multipage').size()
+
+        # Cache the result
+        if request:
+            cache = IAnnotations(request)
+            cache[key] = pages
+
+        return pages
 
     security.declarePrivate('_get_html_content')
-    def _get_html_content(self):
+    def _get_html_content(self, cache_key=None):
+        # Cache the html content if possible
+        request = getattr(self, 'REQUEST', None)
+        if cache_key is None:
+            key = 'cached-html-content-' + self.UID()
+        else:
+            key = 'cached-html-content-' + cache_key
+
+        if request and 0:
+            # Return cached data
+            cache = IAnnotations(request)
+            data = cache.get(key, None)
+            if data is not None:
+                return data
+
+        # import pdb; pdb.set_trace( )
+        #print "In _get_html_content %s" % self.Title()
         plone_tools = getToolByName(self, 'plone_utils')
         encoding = plone_tools.getSiteEncoding()
         layout = self.getField('FormLayout')
         html_content = layout.getRaw(self).decode(encoding)
         html_content = html_content.replace('\r\n', '')
         html_content = html_content.replace('\n', '')
+
         if self.getIsMulti():
             html = pq(html_content)
 
@@ -1032,6 +1067,10 @@ class PlominoForm(ATFolder):
             html.append(paging)
 
             html_content = html.html()
+
+        # Cache the html
+        if request and 0:
+            cache[key] = html_content
 
         return html_content
 
