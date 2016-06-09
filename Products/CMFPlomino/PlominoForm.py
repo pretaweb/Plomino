@@ -818,7 +818,7 @@ class PlominoForm(ATFolder):
             is_multi = self.getIsMulti()
 
         # Use the request for the temp doc in editmode with a multipage form
-        if editmode and request.form and is_multi:
+        if request and editmode and request.form and is_multi:
             use_request = True
             # Use the parent form for the temp doc
             if parent_form_id:
