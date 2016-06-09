@@ -1010,9 +1010,11 @@ class PlominoForm(ATFolder):
         if cached is not None:
             return cached
 
+        pages = 0
         html_content = self._get_html_content()
-        html = pq(html_content)
-        pages = html('.multipage').size()
+        if html_content:
+            html = pq(html_content)
+            pages = html('.multipage').size()
 
         # Cache the result
         db.setRequestCache(cache_key, pages)
@@ -1027,6 +1029,10 @@ class PlominoForm(ATFolder):
         html_content = layout.getRaw(self).decode(encoding)
         html_content = html_content.replace('\r\n', '')
         html_content = html_content.replace('\n', '')
+
+        # If the form is empty, just return the empty string
+        if not html_content:
+            return html_content
 
         html = pq(html_content)
 
@@ -1150,36 +1156,37 @@ class PlominoForm(ATFolder):
                     html_content = html_content.replace(end, '')
 
         # Handle multi page hidewhens
-        num_pages = self._get_num_pages()
-        current_page = self._get_current_page()
-        # 0-indexed pages are ugly
-        for page in xrange(1, num_pages+1):
-            hidewhenName = 'hidewhen-multipage-%s' % page
-            if page == current_page:
-                hidden = False
-            else:
-                hidden = True
+        if self.getIsMulti():
+            num_pages = self._get_num_pages()
+            current_page = self._get_current_page()
+            # 0-indexed pages are ugly
+            for page in xrange(1, num_pages+1):
+                hidewhenName = 'hidewhen-multipage-%s' % page
+                if page == current_page:
+                    hidden = False
+                else:
+                    hidden = True
 
-            start = ('<span class="plominoHidewhenClass">start:%s</span>' % hidewhenName)
-            end = ('<span class="plominoHidewhenClass">end:%s</span>' % hidewhenName)
+                start = ('<span class="plominoHidewhenClass">start:%s</span>' % hidewhenName)
+                end = ('<span class="plominoHidewhenClass">end:%s</span>' % hidewhenName)
 
-            if hidden:
-                style = ' style="display: none"'
-            else:
-                style = ''
+                if hidden:
+                    style = ' style="display: none"'
+                else:
+                    style = ''
 
-            html_content = re.sub(
-                start,
-                '<div class="hidewhen-%s"%s>' % (
-                    hidewhenName,
-                    style),
-                html_content,
-                re.MULTILINE + re.DOTALL)
-            html_content = re.sub(
-                end,
-                '</div>',
-                html_content,
-                re.MULTILINE + re.DOTALL)
+                html_content = re.sub(
+                    start,
+                    '<div class="hidewhen-%s"%s>' % (
+                        hidewhenName,
+                        style),
+                    html_content,
+                    re.MULTILINE + re.DOTALL)
+                html_content = re.sub(
+                    end,
+                    '</div>',
+                    html_content,
+                    re.MULTILINE + re.DOTALL)
 
         return html_content
 
@@ -1296,15 +1303,16 @@ class PlominoForm(ATFolder):
             hidewhens += form.getHidewhenFormulas()
 
         # Set hidewhen values for multipage based on current page
-        num_pages = self._get_num_pages()
-        current_page = self._get_current_page()
-        # 0-indexed pages are ugly
-        for page in xrange(1, num_pages+1):
-            if page == current_page:
-                result['hidewhen-multipage-%s' % page] = False
-            else:
-                # All other pages are hidden
-                result['hidewhen-multipage-%s' % page] = True
+        if self.getIsMulti():
+            num_pages = self._get_num_pages()
+            current_page = self._get_current_page()
+            # 0-indexed pages are ugly
+            for page in xrange(1, num_pages+1):
+                if page == current_page:
+                    result['hidewhen-multipage-%s' % page] = False
+                else:
+                    # All other pages are hidden
+                    result['hidewhen-multipage-%s' % page] = True
 
         for hidewhen in hidewhens:
             if hidewhen.id in result:
