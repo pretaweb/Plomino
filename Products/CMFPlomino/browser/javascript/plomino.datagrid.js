@@ -143,6 +143,13 @@ function datagrid_add_row(table, field_id, formurl) {
 
         // update the datagrid
         table.fnAddData(rowdata);
+        var onsuccess = function(data, textStatus, xhr) {
+            for (var hw in data.hidewhen)
+                $('.hidewhen-' + hw).css('display', data.hidewhen[hw]?'none':'block');
+            for (var df in data.dynamicfields)
+                $('.dynamic-' + df).text(data.dynamicfields[df]);
+        };
+        $.post('computedynamiccontent', $('#plomino_form').serialize(), onsuccess, 'json');
     });
 }
 
@@ -161,7 +168,7 @@ function datagrid_edit_row(table, field_id, formurl) {
         var row_index = datagrid_get_field_index(table, row);
         var json = $.toJSON(field_data[row_index]);
         json = json.replace(/[\u007f-\uffff]/g,
-            function(c) { 
+            function(c) {
                 return '\\u'+('0000'+c.charCodeAt(0).toString(16)).slice(-4);
             }
         );
@@ -173,6 +180,13 @@ function datagrid_edit_row(table, field_id, formurl) {
 
             // update the datagrid
             table.fnUpdate(rowdata, row);
+            var onsuccess = function(data, textStatus, xhr) {
+                for (var hw in data.hidewhen)
+                    $('.hidewhen-' + hw).css('display', data.hidewhen[hw]?'none':'block');
+                for (var df in data.dynamicfields)
+                    $('.dynamic-' + df).text(data.dynamicfields[df]);
+            };
+            $.post('computedynamiccontent', $('#plomino_form').serialize(), onsuccess, 'json');
         });
     }
     else {
@@ -199,6 +213,13 @@ function datagrid_delete_row(table, field_id) {
 
         // delete the row in the datagrid
         table.fnDeleteRow(row, undefined, true);
+        var onsuccess = function(data, textStatus, xhr) {
+            for (var hw in data.hidewhen)
+                $('.hidewhen-' + hw).css('display', data.hidewhen[hw]?'none':'block');
+            for (var df in data.dynamicfields)
+                $('.dynamic-' + df).text(data.dynamicfields[df]);
+        };
+        $.post('computedynamiccontent', $('#plomino_form').serialize(), onsuccess, 'json');
     }
     else {
         alert('You must select a row to delete.');
@@ -249,21 +270,21 @@ function ie8_object_keys () {
  * Inline Editing : compute row as inline Form.
  * - oTable: JQuery DataTables object (returned by the initialisation method)
  * - field_id : field_id to get raw values
- * - formul : url to get edit fields 
+ * - formul : url to get edit fields
  */
 function datagrid_edit_inline_form( oTable, field_id, formurl )
 {
 	var nRow = datagrid_get_selected_row(oTable);
 	if ( nRow ) {
 		var jqTds = $('>td', nRow);
-		var row_index = oTable.fnGetPosition(nRow)	
+		var row_index = oTable.fnGetPosition(nRow)
 
 		var field_data = $.evalJSON( $('#' + field_id + '_gridvalue').val() );
 		var row_data = field_data[row_index];
-		
+
 		formurl += '&Plomino_datagrid_rowdata=' + $.URLEncode($.toJSON(row_data));
 
-		$.getJSON( formurl, function( data ) 
+		$.getJSON( formurl, function( data )
 		{
 			for (var i = 0; i < data.length; i++) {
 				 $( jqTds[i] ).html( data[i] );
@@ -296,11 +317,11 @@ function datagrid_save_inline_row ( oTable, nRow, field_id, form_url ) {
 		if(message===null || message==='')
 		{
 			var row_index = oTable.fnGetPosition(nRow)
-			
+
 			// from response
 			var row_data = $('span.plominochildfield', data).map(function(d,el){ return el.innerHTML });
 			var raw_values = $.evalJSON($('#raw_values', data).html().trim());
-			
+
 			//update field_data
 			var field = $('#' + field_id + '_gridvalue');
 			var field_data= $.evalJSON(field.val());
@@ -311,11 +332,11 @@ function datagrid_save_inline_row ( oTable, nRow, field_id, form_url ) {
 			for (var i=0;i<row_data.length;i++) {
 				var cell_data =  row_data[i];
 				if(cell_data.replace("\n","").trim()!="" && $(cell_data)!=null && $(cell_data).hasClass('TEXTFieldRead-TEXTAREA')) {
-					cell_data = $(cell_data).html();			  	
+					cell_data = $(cell_data).html();
 				}
 				oTable.fnUpdate( cell_data, nRow, i, false );
-			} 
-			
+			}
+
 			oTable.fnDraw();
 			return true;
 		}
@@ -330,7 +351,7 @@ function datagrid_save_inline_row ( oTable, nRow, field_id, form_url ) {
 /*
  * Inline Editing : add form with empty values to the datagrid.
  * - oTable: JQuery DataTables object (returned by the initialisation method)
- * - fields : needed fields to render the form 
+ * - fields : needed fields to render the form
  */
 function datagrid_add_inline_row( oTable, fields) {
 
@@ -370,4 +391,4 @@ function datagrid_restore_row( oTable, nRow ) {
 	}
 	}
 	oTable.fnDraw();
-} 
+}
