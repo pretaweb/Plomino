@@ -149,7 +149,7 @@ function datagrid_add_row(table, field_id, formurl) {
             for (var df in data.dynamicfields)
                 $('.dynamic-' + df).text(data.dynamicfields[df]);
         };
-        $.get('computedynamiccontent', $('#plomino_form').serialize(), onsuccess, 'json');
+        $.post('computedynamiccontent', $('#plomino_form').serialize(), onsuccess, 'json');
     });
 }
 
@@ -186,7 +186,7 @@ function datagrid_edit_row(table, field_id, formurl) {
                 for (var df in data.dynamicfields)
                     $('.dynamic-' + df).text(data.dynamicfields[df]);
             };
-            $.get('computedynamiccontent', $('#plomino_form').serialize(), onsuccess, 'json');
+            $.post('computedynamiccontent', $('#plomino_form').serialize(), onsuccess, 'json');
         });
     }
     else {
@@ -219,7 +219,7 @@ function datagrid_delete_row(table, field_id) {
             for (var df in data.dynamicfields)
                 $('.dynamic-' + df).text(data.dynamicfields[df]);
         };
-        $.get('computedynamiccontent', $('#plomino_form').serialize(), onsuccess, 'json');
+        $.post('computedynamiccontent', $('#plomino_form').serialize(), onsuccess, 'json');
     }
     else {
         alert('You must select a row to delete.');
