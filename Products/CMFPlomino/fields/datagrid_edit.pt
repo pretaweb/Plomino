@@ -4,6 +4,8 @@
             request field/REQUEST;
             v options/fieldvalue;
             data python:field.getSettings().tojson(v);
+            rendered_data python:field.getSettings().tojson(v, rendered=True);
+            need_ajax python:len(v['rendered']) > 10 if 'rendered' in v else True;
             form field/getParentNode;
             form_name form/id;
             form_url python:form.absolute_url();
@@ -22,7 +24,9 @@
             id string:${fieldname}_gridvalue;
             name fieldname;
             value data"/>
-        <script
+
+        <tal:block tal:condition="need_ajax">
+            <script
                 type="text/javascript"
                 charset="utf-8"
                 tal:define="
@@ -34,7 +38,7 @@
                 jQuery(document).ready(function() {
                     ${fieldname}_datatable = jQuery('#${fieldname}_datagrid').dataTable( {
                         'sAjaxSource': 'tojson?item=${fieldname}&rendered=true&datatables=true',
-                        'sServerMethod': '${form_method}',
+                        'sServerMethod': 'GET',
                         'fnServerParams': function ( aoData ) {
                             ${request_items}
                         },
@@ -50,12 +54,12 @@
                             'sUrl': '@@collective.js.datatables.translation'
                         }
                     } );
-                    /** 
-                        INLINE EDITING MODE 
+                    /**
+                        INLINE EDITING MODE
                     **/
                     if('${associated_form_rendering}'==='INLINE') {
 
-                        var ${fieldname}_nEditing = null;                   
+                        var ${fieldname}_nEditing = null;
 
                         /** Add inline creation form **/
                         jQuery('#${fieldname}_addrow').click( function (e) {
@@ -66,11 +70,11 @@
                         /** Compute inline form **/
                         function ${fieldname}_computeEdit(event){
                             event.preventDefault();
-                            if ( ${fieldname}_nEditing!=null ) { 
-                                datagrid_restore_row(${fieldname}_datatable, ${fieldname}_nEditing); 
-                            } 
+                            if ( ${fieldname}_nEditing!=null ) {
+                                datagrid_restore_row(${fieldname}_datatable, ${fieldname}_nEditing);
+                            }
                             var url = '${form_url}/${fieldname}/editFields?';
-                            ${fieldname}_nEditing = datagrid_edit_inline_form(${fieldname}_datatable,'${fieldname}',url);                     
+                            ${fieldname}_nEditing = datagrid_edit_inline_form(${fieldname}_datatable,'${fieldname}',url);
                         }
 
                         jQuery('#${fieldname}_editrow').click(${fieldname}_computeEdit);
@@ -97,7 +101,7 @@
                             ${fieldname}_nEditing = null;
                         });
                     }
-                    /** 
+                    /**
                         MODAL MODE
                     **/
                     else{
@@ -117,9 +121,106 @@
 
                     /** Code for hiding repeating subforms **/
 
-                    
+
                 } );">
-        </script>
+            </script>
+        </tal:block>
+        <tal:block tal:condition="not:need_ajax">
+            <script
+                type="text/javascript"
+                charset="utf-8"
+                tal:define="
+                param python:field.getSettings().getParameters();
+                request_items python:field.getSettings().request_items_aoData(request);
+                "
+                tal:content="structure string:
+                var ${fieldname}_datatable;
+                jQuery(document).ready(function() {
+                    ${fieldname}_datatable = jQuery('#${fieldname}_datagrid').dataTable( {
+                        'aaData': ${rendered_data},
+                        'bJQueryUI': true,
+                        ${param},
+                        'fnDrawCallback': function() {
+                            jQuery('#${fieldname}_datagrid > tbody > tr').click(function() {
+                                datagrid_deselect_rows(${fieldname}_datatable);
+                                jQuery(this).addClass('datagrid_row_selected');
+                            });
+                        },
+                        'oLanguage': {
+                            'sUrl': '@@collective.js.datatables.translation'
+                        }
+                    } );
+                    /**
+                        INLINE EDITING MODE
+                    **/
+                    if('${associated_form_rendering}'==='INLINE') {
+
+                        var ${fieldname}_nEditing = null;
+
+                        /** Add inline creation form **/
+                        jQuery('#${fieldname}_addrow').click( function (e) {
+                            e.preventDefault();
+                            ${fieldname}_nEditing = datagrid_add_inline_row( ${fieldname}_datatable,  ${new_fields} )
+                        } );
+
+                        /** Compute inline form **/
+                        function ${fieldname}_computeEdit(event){
+                            event.preventDefault();
+                            if ( ${fieldname}_nEditing!=null ) {
+                                datagrid_restore_row(${fieldname}_datatable, ${fieldname}_nEditing);
+                            }
+                            var url = '${form_url}/${fieldname}/editFields?';
+                            ${fieldname}_nEditing = datagrid_edit_inline_form(${fieldname}_datatable,'${fieldname}',url);
+                        }
+
+                        jQuery('#${fieldname}_editrow').click(${fieldname}_computeEdit);
+                        jQuery('#${fieldname}_datagrid tbody>tr').live('dblclick', ${fieldname}_computeEdit);
+
+                        /** Save changes **/
+                        jQuery('#${fieldname}_datagrid button.save').live('click', function (e) {
+                            e.preventDefault();
+                            var nRow = $(this).parents('tr')[0];
+                            var url = '${associated_form_url}/createDocument?Plomino_Parent_Field=${fieldname}&Plomino_Parent_Form=${form_name}';
+
+                            if ( ${fieldname}_nEditing == nRow ) {
+                                var succeeded = datagrid_save_inline_row( ${fieldname}_datatable, ${fieldname}_nEditing,'${fieldname}',url);
+                                if(succeeded===true)
+                                    ${fieldname}_nEditing = null;
+                            }
+                        } );
+
+                        /** Cancel edition **/
+                        jQuery('#${fieldname}_datagrid button.cancel').live('click', function (e) {
+                            e.preventDefault();
+                            var nRow = $(this).parents('tr')[0];
+                            datagrid_restore_row(${fieldname}_datatable, nRow);
+                            ${fieldname}_nEditing = null;
+                        });
+                    }
+                    /**
+                        MODAL MODE
+                    **/
+                    else{
+
+                        jQuery('#${fieldname}_addrow').click(function() {
+                            datagrid_add_row(${fieldname}_datatable, '${fieldname}', this.href);
+                        });
+                        jQuery('#${fieldname}_editrow').click(function() {
+                            datagrid_edit_row(${fieldname}_datatable, '${fieldname}', this.href);
+                        });
+                        jQuery('#${fieldname}_editform').dialog({ 'autoOpen': false, 'modal': true });
+                    }
+
+                    jQuery('#${fieldname}_deleterow').click(function() {
+                        datagrid_delete_row(${fieldname}_datatable, '${fieldname}');
+                    });
+
+                    /** Code for hiding repeating subforms **/
+
+
+                } );">
+            </script>
+        </tal:block>
 
         <table class="display" tal:attributes="id string:${fieldname}_datagrid">
         </table>
