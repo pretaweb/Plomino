@@ -13,7 +13,7 @@ __docformat__ = 'plaintext'
 # std
 from decimal import Decimal
 
-# Zope 
+# Zope
 from zope.formlib import form
 from zope.interface import implements
 from zope.schema import getFields
@@ -24,7 +24,7 @@ from dictionaryproperty import DictionaryProperty
 
 # Plomino
 from Products.CMFPlomino.browser import PlominoMessageFactory as _
-from Products.CMFPlomino.PlominoUtils import PlominoTranslate 
+from Products.CMFPlomino.PlominoUtils import PlominoTranslate
 from base import IBaseField, BaseField, BaseForm
 
 import logging
@@ -52,7 +52,7 @@ class INumberField(IBaseField):
             title=u'Format',
             description=u'Number formatting (example: %1.2f)',
             required=False)
-    
+
 class NumberField(BaseField):
     """
     """
@@ -68,7 +68,7 @@ class NumberField(BaseField):
                 v = long(submittedValue)
             except:
                 errors.append(
-                        fieldname + 
+                        fieldname +
                         PlominoTranslate(
                             _(" must be an integer (submitted value was: "),
                             self.context) +
@@ -81,7 +81,7 @@ class NumberField(BaseField):
                         fieldname +
                         PlominoTranslate(
                             _(" must be a float (submitted value was: "),
-                            self.context) + 
+                            self.context) +
                         submittedValue + ")")
         elif self.type == "DECIMAL":
             try:
@@ -91,7 +91,7 @@ class NumberField(BaseField):
                         fieldname +
                         PlominoTranslate(
                             _(" must be a decimal (submitted value was: "),
-                            self.context) + 
+                            self.context) +
                         submittedValue + ")")
 
         return errors
@@ -99,15 +99,22 @@ class NumberField(BaseField):
     def processInput(self, submittedValue):
         """
         """
-        if self.type == "INTEGER":
-            return long(submittedValue)
-        elif self.type == "FLOAT":
-            return float(submittedValue)
-        elif self.type == "DECIMAL":
-            return Decimal(str(submittedValue))
-        else:
-            logger.info('Number of unknown type: ' + submittedValue)
-            return submittedValue
+        value = submittedValue
+        try:
+            if self.type == "INTEGER":
+                value = long(submittedValue)
+            elif self.type == "FLOAT":
+                value = float(submittedValue)
+            elif self.type == "DECIMAL":
+                value = Decimal(str(submittedValue))
+            else:
+                logger.info('Number of unknown type: ' + submittedValue)
+        except Exception as e:
+            # catch ValueError and Decimal.InvalidOperation
+            # field contains invalid value during dynamic hidewhen
+            logger.error(repr(e))
+        return value
+
 
     def format_value(self, v):
         """
@@ -130,4 +137,3 @@ class SettingForm(BaseForm):
     """
     """
     form_fields = form.Fields(INumberField)
-
