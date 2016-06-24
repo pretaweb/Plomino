@@ -462,8 +462,10 @@ class DatagridField(BaseField):
         if not editmode:
             return
         # handle max_repeats
+        # create a temp doc to use for the repeats with an empty request
+        tmp = TemporaryDocument(db, child_form, {})
         for i in range(len(fieldValue), self.max_repeats):
-            html = child_form.displayDocument(doc=None,
+            html = child_form.displayDocument(doc=tmp,
                                               editmode=editmode,
                   creation=True,
                   parent_form_id=self.context.getForm().id,
