@@ -308,8 +308,8 @@ class DatagridField(BaseField):
                 validation_mode=False).__of__(db) 
 
         # return rendered field for each mapped field if this one exists in the child form
-	child_form_fields = [f.getFieldRender(child_form, target, editmode=editmode, creation=creation, request=request) for f in [child_form.getFormField(f) for f in mapped_fields] if f]
-	return json.dumps(child_form_fields)
+        child_form_fields = [f.getFieldRender(child_form, target, editmode=editmode, creation=creation, request=request) for f in [child_form.getFormField(f) for f in mapped_fields] if f]
+        return json.dumps(child_form_fields)
 
     def getAssociateForm(self):
         child_form_id = self.associated_form;
