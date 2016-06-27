@@ -1199,10 +1199,16 @@ class PlominoForm(ATFolder):
     security.declareProtected(READ_PERMISSION, 'hasDynamicContent')
     def hasDynamicContent(self):
         """Check for dynamic content on the form"""
-        if self.hasDynamicHidewhen():
+        db = self.getParentDatabase()
+        cache_key = 'hasDynamicContent_%s' % hash(self)
+        cache = db.getRequestCache(cache_key)
+        if cache is not None:
+            return cache
+
+        if self.hasDynamicHidewhen() or self.hasDynamicFields():
+            db.setRequestCache(cache_key, True)
             return True
-        if self.hasDynamicFields():
-            return True
+
         return False
 
     security.declareProtected(READ_PERMISSION, 'hasDynamicFields')
@@ -1529,7 +1535,20 @@ class PlominoForm(ATFolder):
         """ Return True if the form contains at least one DateTime field
         or a datagrid (as a datagrid may contain a date).
         """
-        return self._has_fieldtypes(["DATETIME", "DATAGRID"])
+        db = self.getParentDatabase()
+        cache_key = 'hasDateTimeField_%d' % hash(self)
+        cache = db.getRequestCache(cache_key)
+        if cache is not None:
+            return cache
+
+        # Calling this without applying hidewhens ensures that if the hidewhen
+        # is activated, we're not missing something we need
+        result = self._has_fieldtypes(
+            ["DATETIME", "DATAGRID"],
+            applyhidewhen=False
+        )
+        db.setRequestCache(cache_key, result)
+        return result
 
     security.declarePrivate('_has_fieldtypes')
     def _has_fieldtypes(self, types, applyhidewhen=True):
@@ -1558,7 +1577,15 @@ class PlominoForm(ATFolder):
     def hasGoogleVisualizationField(self):
         """ Return true if the form contains at least one GoogleVisualization field
         """
-        return self._has_fieldtypes(["GOOGLEVISUALIZATION"], applyhidewhen=False)
+        db = self.getParentDatabase()
+        cache_key = 'hasGoogleVisualizationField_%d' % hash(self)
+        cache = db.getRequestCache(cache_key)
+        if cache is not None:
+            return cache
+
+        result = self._has_fieldtypes(["GOOGLEVISUALIZATION"], applyhidewhen=False)
+        db.setRequestCache(cache_key, result)
+        return result
 
     security.declarePublic('getSubforms')
     def getSubforms(self, doc=None, applyhidewhen=True, validation_mode=False):
