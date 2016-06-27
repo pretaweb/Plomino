@@ -668,6 +668,13 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
     def _getCatalogTool(self):
         return self.getParentDatabase().getIndex()
 
+    security.declareProtected(READ_PERMISSION, 'getDynamicContentAsJSON')
+    def getDynamicContentAsJSON(self, REQUEST, parent_form=None, validation_mode=False):
+        form = self.getForm()
+        return form.getDynamicContentAsJSON(REQUEST, parent_form=parent_form,
+                                            doc=self,
+                                            validation_mode=validation_mode)
+
     security.declarePublic('__getattr__')
     def __getattr__(self, name):
         """ Overloads `getattr` to return item values as attributes.
