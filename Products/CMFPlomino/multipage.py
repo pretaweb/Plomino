@@ -107,9 +107,7 @@ class PageView(BrowserView):
                     next_page = form._get_next_page(self.request, action='linkto', target=linkto)
                     return self.redirect(next_page)
 
-            # Pass in the current doc as well. This ensures that fields on other
-            # pages are included (possibly needed for calculations)
-            errors = form.validateInputs(self.request, doc=self.context)
+            errors = form.validateInputs(self.request)
 
             if errors:
                 return self.context.EditDocument(request=self.request, page_errors=errors)
