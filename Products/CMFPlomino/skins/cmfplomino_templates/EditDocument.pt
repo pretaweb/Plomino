@@ -75,7 +75,6 @@ jQuery(document).ready( function() {
         has_form python:here.hasItem('Form');
         form python:here.getForm();
         hasDateTimeField python:form.hasDateTimeField();
-        hasDynamicHidewhen python:form.hasDynamicHidewhen();
         hasGoogleVisualizationField python:form.hasGoogleVisualizationField()
         ">
     <tal:has_form condition="has_form">
