@@ -96,7 +96,7 @@ class PageView(BrowserView):
             # or a value from the request
 
             if 'back' in self.request.form:
-                next_page = form._get_next_page(self.request, action='back')
+                next_page = form._get_next_page(self.request, doc=self.context, action='back')
                 return self.redirect(next_page)
 
             # Handle linking
@@ -104,10 +104,12 @@ class PageView(BrowserView):
             for key in self.request.form.keys():
                 if key.startswith('plominolinkto-'):
                     linkto = key.replace('plominolinkto-', '')
-                    next_page = form._get_next_page(self.request, action='linkto', target=linkto)
+                    next_page = form._get_next_page(self.request, doc=self.context, action='linkto', target=linkto)
                     return self.redirect(next_page)
 
-            errors = form.validateInputs(self.request)
+            # Pass in the current doc as well. This ensures that fields on other
+            # pages are included (possibly needed for calculations)
+            errors = form.validateInputs(self.request, doc=self.context)
 
             if errors:
                 return self.context.EditDocument(request=self.request, page_errors=errors)
@@ -115,7 +117,7 @@ class PageView(BrowserView):
             # Any buttons progress the user through the form
             # XXX: We need to handle other types of buttons here
             if current_page < (num_pages):
-                next_page = form._get_next_page(self.request, action='continue')
+                next_page = form._get_next_page(self.request, doc=self.context, action='continue')
 
             # execute the beforeSave code of the form
             error = None

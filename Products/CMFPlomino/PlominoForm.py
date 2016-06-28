@@ -415,7 +415,7 @@ class PlominoForm(ATFolder):
     def get_resources_js(self):
         return self._get_resource_urls('ResourcesJS')
 
-    def _get_next_page(self, REQUEST, action='continue', target=None):
+    def _get_next_page(self, REQUEST, doc=None, action='continue', target=None):
         # Get the next page number, moving forwards or backwards through the form
         current_page = self._get_current_page()
         num_pages = self._get_num_pages()
@@ -423,8 +423,9 @@ class PlominoForm(ATFolder):
 
         # Create a temp doc and calculate hidewhens
         db = self.getParentDatabase()
-        tmp = getTemporaryDocument(db, self, REQUEST, validation_mode=True).__of__(db)
-        html = pq(self.applyHideWhen(tmp))
+        tmp = getTemporaryDocument(db, self, REQUEST, doc=doc, validation_mode=True).__of__(db)
+        # Make sure we don't split the multipage up
+        html = pq(self.applyHideWhen(tmp, split_multipage=False))
 
         if action == 'linkto':
             if target is not None:
@@ -833,7 +834,14 @@ class PlominoForm(ATFolder):
             use_request = False
 
         # Create a temp doc to work with
-        if doc is None or use_request:
+        if doc and use_request:
+            temp_doc = getTemporaryDocument(
+                db,
+                tempdoc_form,
+                self.REQUEST,
+                doc=doc
+            )
+        elif doc is None or use_request:
             temp_doc = getTemporaryDocument(
                 db,
                 tempdoc_form,
@@ -1095,9 +1103,16 @@ class PlominoForm(ATFolder):
         return html_content
 
     security.declareProtected(READ_PERMISSION, 'applyHideWhen')
-    def applyHideWhen(self, doc=None, silent_error=True):
+    def applyHideWhen(self, doc=None, silent_error=True, split_multipage=True):
         """ Evaluate hide-when formula and return resulting layout
         """
+        # TODO: this stops page forms from working properly 
+        # db = self.getParentDatabase()
+        # cache_key = "applyHideWhen_%d_%d_%d_%d" % (hash(self), hash(doc), hash(doc.REQUEST), hash(split_multipage))
+        # cache = self.getRequestCache(cache_key)
+        # if cache is not None:
+        #     return cache
+
         html_content = self._get_html_content()
 
         # remove the hidden content
@@ -1194,6 +1209,17 @@ class PlominoForm(ATFolder):
                     html_content,
                     re.MULTILINE + re.DOTALL)
 
+            # Most of the time we want to ignore all pages that aren't the
+            # current page.
+            # Only run if it's a real document? and doc.isDocument
+            if split_multipage and doc.isDocument():
+                html = pq(html_content)
+                for page in xrange(1, num_pages+1):
+                    if page != current_page:
+                        html.remove('.hidewhen-hidewhen-multipage-%s' % page)
+                html_content = html.html()
+
+        # db.setRequestCache(cache_key, html_content)
         return html_content
 
     security.declareProtected(READ_PERMISSION, 'hasDynamicContent')
