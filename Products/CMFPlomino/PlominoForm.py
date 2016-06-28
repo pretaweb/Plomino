@@ -1106,12 +1106,12 @@ class PlominoForm(ATFolder):
     def applyHideWhen(self, doc=None, silent_error=True, split_multipage=True):
         """ Evaluate hide-when formula and return resulting layout
         """
-        db = self.getParentDatabase()
-        cache_key = "applyHideWhen_%d_%d_%d" % (hash(self), hash(doc), hash(split_multipage))
-        cache = self.getRequestCache(cache_key)
+        # TODO: this stops page forms from working properly 
+        # db = self.getParentDatabase()
+        # cache_key = "applyHideWhen_%d_%d_%d_%d" % (hash(self), hash(doc), hash(doc.REQUEST), hash(split_multipage))
+        # cache = self.getRequestCache(cache_key)
         # if cache is not None:
-        # print "Getting cached: %s" % cache_key
-        # return cache
+        #     return cache
 
         html_content = self._get_html_content()
 
@@ -1212,14 +1212,14 @@ class PlominoForm(ATFolder):
             # Most of the time we want to ignore all pages that aren't the
             # current page.
             # Only run if it's a real document? and doc.isDocument
-            if split_multipage: 
+            if split_multipage and doc.isDocument():
                 html = pq(html_content)
                 for page in xrange(1, num_pages+1):
                     if page != current_page:
                         html.remove('.hidewhen-hidewhen-multipage-%s' % page)
                 html_content = html.html()
 
-        db.setRequestCache(cache_key, html_content)
+        # db.setRequestCache(cache_key, html_content)
         return html_content
 
     security.declareProtected(READ_PERMISSION, 'hasDynamicContent')
