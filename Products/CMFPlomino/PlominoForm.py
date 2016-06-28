@@ -852,7 +852,7 @@ class PlominoForm(ATFolder):
             temp_doc = doc
 
         # remove the hidden content
-        html_content = self.applyHideWhen(temp_doc, silent_error=False)
+        html_content = self.applyHideWhen(temp_doc, silent_error=False, cache_key='displayDocument')
         if request:
             parent_form_ids = request.get('parent_form_ids', [])
             if parent_form_id:
@@ -1103,15 +1103,22 @@ class PlominoForm(ATFolder):
         return html_content
 
     security.declareProtected(READ_PERMISSION, 'applyHideWhen')
-    def applyHideWhen(self, doc=None, silent_error=True, split_multipage=True):
+    def applyHideWhen(self, doc=None, silent_error=True, split_multipage=True,
+                      cache_key=''):
         """ Evaluate hide-when formula and return resulting layout
         """
-        # TODO: this stops page forms from working properly 
-        # db = self.getParentDatabase()
-        # cache_key = "applyHideWhen_%d_%d_%d_%d" % (hash(self), hash(doc), hash(doc.REQUEST), hash(split_multipage))
-        # cache = self.getRequestCache(cache_key)
-        # if cache is not None:
-        #     return cache
+        db = self.getParentDatabase()
+        # Some methods might pass in their own cache_key. Add the rest
+        # of the key values to the key.
+        cache_key = "applyHideWhen_%d_%d_%d_%s" % (
+            hash(self),
+            hash(doc),
+            hash(split_multipage),
+            cache_key
+        )
+        cache = self.getRequestCache(cache_key)
+        if cache is not None:
+            return cache
 
         html_content = self._get_html_content()
 
@@ -1219,7 +1226,7 @@ class PlominoForm(ATFolder):
                         html.remove('.hidewhen-hidewhen-multipage-%s' % page)
                 html_content = html.html()
 
-        # db.setRequestCache(cache_key, html_content)
+        db.setRequestCache(cache_key, html_content)
         return html_content
 
     security.declareProtected(READ_PERMISSION, 'hasDynamicContent')
