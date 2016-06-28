@@ -671,8 +671,11 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
     security.declareProtected(READ_PERMISSION, 'getDynamicContentAsJSON')
     def getDynamicContentAsJSON(self, REQUEST, parent_form=None, validation_mode=False):
         form = self.getForm()
+        db = self.getParentDatabase()
+        # Create a temporary document using the request
+        tmpdoc = getTemporaryDocument(db, form, REQUEST, doc=self)
         return form.getDynamicContentAsJSON(REQUEST, parent_form=parent_form,
-                                            doc=self,
+                                            doc=tmpdoc,
                                             validation_mode=validation_mode)
 
     security.declarePublic('__getattr__')
