@@ -59,6 +59,13 @@
       class=".multipage.PageView"
       />
 
+    <browser:view
+      for="Products.CMFPlomino.interfaces.IPlominoDocument"
+      name="pageview"
+      permission="zope.Public"
+      class=".multipage.ReadPageView"
+      />
+
 
   <!-- interfaces moved to zope.container since Plone4.3 /-->
   <subscriber
