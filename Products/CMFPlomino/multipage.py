@@ -118,6 +118,9 @@ class PageView(BrowserView):
             # XXX: We need to handle other types of buttons here
             if current_page < (num_pages):
                 next_page = form._get_next_page(self.request, doc=self.context, action='continue')
+            else:
+                # Don't go past the end of the form
+                next_page = num_pages
 
             # execute the beforeSave code of the form
             error = None
@@ -199,3 +202,50 @@ class PageView(BrowserView):
 
         else:
             return form.OpenForm(request=self.request)
+
+
+@implementer(IPublishTraverse)
+class ReadPageView(PageView):
+
+    def _handle_document(self):
+        form = self.context.getForm()
+
+        # Get multi page information
+        current_page = form._get_current_page()
+        num_pages = form._get_num_pages()
+
+        # If there is something in the form
+        if self.request.form:
+            # If they have gone past the end of the form, send them back
+            if current_page > num_pages:
+                return self.redirect(num_pages)
+
+            if 'back' in self.request.form:
+                next_page = form._get_next_page(self.request, doc=self.context, action='back')
+                return self.redirect(next_page)
+
+            # Handle linking
+            linkto = False
+            for key in self.request.form.keys():
+                if key.startswith('plominolinkto-'):
+                    linkto = key.replace('plominolinkto-', '')
+                    next_page = form._get_next_page(self.request, doc=self.context, action='linkto', target=linkto)
+                    return self.redirect(next_page)
+
+            # Any buttons progress the user through the form
+            # XXX: We need to handle other types of buttons here
+            if current_page < (num_pages):
+                next_page = form._get_next_page(self.request, doc=self.context, action='continue')
+            else:
+                # Don't go past the end of the form
+                next_page = num_pages
+
+            return self.redirect(next_page)
+
+        return self.context.OpenDocument()
+
+    def redirect(self, page):
+        url = self.context.absolute_url()
+        # Tidy up the URL
+        url = url.replace('plomino_documents/', '')
+        return self.request.RESPONSE.redirect('%s/pageview/%s' % (url, page))
