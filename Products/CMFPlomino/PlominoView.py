@@ -579,6 +579,22 @@ class PlominoView(ATFolder):
             rows.append(row)
         return rows
 
+    security.declareProtected(READ_PERMISSION, 'checkOnOpen')
+    def checkOnOpen(self):
+        if self.checkUserPermission(READ_PERMISSION):
+            valid = ''
+            try:
+                if self.getOnOpenView():
+                    valid = self.runFormulaScript(
+                            SCRIPT_ID_DELIMITER.join(['view', self.id, 'onopen']),
+                            self,
+                            self.getOnOpenView)
+            except PlominoScriptException, e:
+                e.reportError('onOpenView event failed')
+
+            if valid:
+                return self.ErrorMessages(errors=[{'error': valid}])
+
     security.declareProtected(READ_PERMISSION, 'exportCSV')
     def exportCSV(self,
             REQUEST=None,
@@ -591,6 +607,13 @@ class PlominoView(ATFolder):
 
         IMPORTANT: brain_docs are supposed to be ZCatalog brains
         """
+
+        # check security of object before opening
+        errormsg = self.checkOnOpen()
+        if errormsg:
+            return errormsg
+
+
         if REQUEST:
             if REQUEST.get("separator"):
                 separator = REQUEST.get("separator")
@@ -643,6 +666,12 @@ class PlominoView(ATFolder):
             filename=''):
         """ Export CSV as ZIP
         """
+
+        # check security of object before opening
+        errormsg = self.checkOnOpen()
+        if errormsg:
+            return errormsg
+
         if REQUEST:
             if REQUEST.get("separator"):
                 separator = REQUEST.get("separator")
@@ -671,6 +700,12 @@ class PlominoView(ATFolder):
 
         IMPORTANT: brain_docs are supposed to be ZCatalog brains
         """
+
+        # check security of object before opening
+        errormsg = self.checkOnOpen()
+        if errormsg:
+            return errormsg 
+
         if REQUEST:
             if REQUEST.get("displayColumnsTitle"):
                 displayColumnsTitle = REQUEST.get("displayColumnsTitle")
