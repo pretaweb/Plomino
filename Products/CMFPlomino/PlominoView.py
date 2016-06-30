@@ -311,7 +311,7 @@ class PlominoView(ATFolder):
                 e.reportError('onOpenView event failed')
 
             if valid:
-                return self.ErrorMessages(errors=[valid])
+                return self.ErrorMessages(errors=[{'error': valid}])
 
             if self.getViewTemplate():
                 pt = self.resources._getOb(self.getViewTemplate())
