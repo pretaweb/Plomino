@@ -648,6 +648,10 @@ class PlominoForm(ATFolder):
         - if the referenced field does not exist, leave the layout markup as
           is (as for missing field markup).
         """
+        # Don't try to process an empty HTML doc
+        if not html_content_orig:
+            return html_content_orig
+
         html_content_processed = html_content_orig # We edit the copy
         # from lxml import etree
 
