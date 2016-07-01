@@ -393,6 +393,12 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
             return 'page/%s' % form._get_current_page()
         return 'saveDocument'
 
+    def getOpenFormAction(self):
+        form = self.getForm()
+        if form.getIsMulti():
+            return 'pageview/%s' % form._get_current_page()
+        return ''
+
     security.declareProtected(EDIT_PERMISSION, 'saveDocument')
     def saveDocument(self, REQUEST, creation=False):
         """ Save a document using the form submitted content
