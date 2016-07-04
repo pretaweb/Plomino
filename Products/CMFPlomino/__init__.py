@@ -47,6 +47,7 @@ from zope import component
 from zope.interface import implements
 from DateTime import DateTime
 from zope.component import queryUtility
+import Missing
 
 # CMF/Plone
 from Products.PythonScripts.Utility import allow_module
@@ -66,11 +67,14 @@ DirectoryView.registerDirectory('skins', product_globals)
 
 
 # Override default JSONEncoder/JSONDecoder classes in jsonutil to handle
-# dates:
+# dates and Missing Values.
+# Raise a TypeError if the object isn't serialisable.
 def _extended_json_encoding(obj):
     if isinstance(obj, DateTime):
         return {'<datetime>': True, 'datetime': obj.ISO()}
-    return json.dumps(obj)
+    if obj == Missing.Value:
+        return None
+    raise TypeError
 
 json._default_encoder = JSONEncoder(
         skipkeys=False,
