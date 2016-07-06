@@ -16,9 +16,9 @@
         has_form python:here.hasItem('Form');
         form python:here.getForm();
         form_method python:form.getFormMethod();
-        hasDateTimeField python:form.hasDateTimeField();
+        hasDateTimeField python:here.hasDateTimeField();
         hasDynamicContent python:form.hasDynamicContent();
-        hasGoogleVisualizationField python:form.hasGoogleVisualizationField()
+        hasGoogleVisualizationField python:here.hasGoogleVisualizationField()
         ">
     <tal:has_form condition="has_form">
         <tal:has_date condition="hasDateTimeField">
@@ -74,8 +74,8 @@ jQuery(document).ready( function() {
     tal:define="
         has_form python:here.hasItem('Form');
         form python:here.getForm();
-        hasDateTimeField python:form.hasDateTimeField();
-        hasGoogleVisualizationField python:form.hasGoogleVisualizationField()
+        hasDateTimeField python:here.hasDateTimeField();
+        hasGoogleVisualizationField python:here.hasGoogleVisualizationField()
         ">
     <tal:has_form condition="has_form">
         <tal:has_date condition="hasDateTimeField">

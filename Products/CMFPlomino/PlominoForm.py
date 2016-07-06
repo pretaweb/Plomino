@@ -1568,12 +1568,12 @@ class PlominoForm(ATFolder):
         return fieldvalue
 
     security.declarePublic('hasDateTimeField')
-    def hasDateTimeField(self):
+    def hasDateTimeField(self, doc=None):
         """ Return True if the form contains at least one DateTime field
         or a datagrid (as a datagrid may contain a date).
         """
         db = self.getParentDatabase()
-        cache_key = 'hasDateTimeField_%d' % hash(self)
+        cache_key = 'hasDateTimeField_%d_%d' % (hash(self), hash(doc))
         cache = db.getRequestCache(cache_key)
         if cache is not None:
             return cache
@@ -1582,19 +1582,22 @@ class PlominoForm(ATFolder):
         # is activated, we're not missing something we need
         result = self._has_fieldtypes(
             ["DATETIME", "DATAGRID"],
-            applyhidewhen=False
+            applyhidewhen=False,
+            doc=doc,
         )
         db.setRequestCache(cache_key, result)
         return result
 
     security.declarePrivate('_has_fieldtypes')
-    def _has_fieldtypes(self, types, applyhidewhen=True):
+    def _has_fieldtypes(self, types, applyhidewhen=True, doc=None):
         """ ``types`` is a list of strings.
         Check if any of those types are present.
         """
         tmp = None
         db = self.getParentDatabase()
-        if hasattr(self, 'REQUEST'):
+        if doc is not None:
+            tmp = doc
+        elif hasattr(self, 'REQUEST'):
             # hideWhens need a TemporaryDocument
             tmp = getTemporaryDocument(
                     db,
@@ -1611,16 +1614,16 @@ class PlominoForm(ATFolder):
         return False
 
     security.declarePublic('hasGoogleVisualizationField')
-    def hasGoogleVisualizationField(self):
+    def hasGoogleVisualizationField(self, doc=None):
         """ Return true if the form contains at least one GoogleVisualization field
         """
         db = self.getParentDatabase()
-        cache_key = 'hasGoogleVisualizationField_%d' % hash(self)
+        cache_key = 'hasGoogleVisualizationField_%d_%d' % (hash(self), hash(doc))
         cache = db.getRequestCache(cache_key)
         if cache is not None:
             return cache
 
-        result = self._has_fieldtypes(["GOOGLEVISUALIZATION"], applyhidewhen=False)
+        result = self._has_fieldtypes(["GOOGLEVISUALIZATION"], applyhidewhen=False, doc=doc)
         db.setRequestCache(cache_key, result)
         return result
 

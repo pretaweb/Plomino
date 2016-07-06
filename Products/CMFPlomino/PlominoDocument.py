@@ -684,6 +684,26 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
                                             doc=tmpdoc,
                                             validation_mode=validation_mode)
 
+    security.declarePublic('hasDateTimeField')
+    def hasDateTimeField(self):
+        """ Set up a tmpdoc then check the form
+        """
+        form = self.getForm()
+        db = self.getParentDatabase()
+        REQUEST = getattr(self, 'REQUEST', None)
+        tmpdoc = getTemporaryDocument(db, form, REQUEST, doc=self)
+        return form.hasDateTimeField(doc=tmpdoc)
+
+    security.declarePublic('hasGoogleVisualizationField')
+    def hasGoogleVisualizationField(self, doc=None):
+        """ Set up a tmpdoc then check the form
+        """
+        form = self.getForm()
+        db = self.getParentDatabase()
+        REQUEST = getattr(self, 'REQUEST', None)
+        tmpdoc = getTemporaryDocument(db, form, REQUEST, doc=self)
+        return form.hasGoogleVisualizationField(doc=tmpdoc)
+
     security.declarePublic('__getattr__')
     def __getattr__(self, name):
         """ Overloads `getattr` to return item values as attributes.
