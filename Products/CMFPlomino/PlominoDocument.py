@@ -1057,18 +1057,6 @@ addPlominoDocument = Factory(PlominoDocument)
 addPlominoDocument.__name__ = "addPlominoDocument"
 
 def getTemporaryDocument(db, form, REQUEST, doc=None, validation_mode=False):
-    # Cache the temporary document
-    cache_key = "getTemporaryDocument_%d_%d_%d_%d_%d" % (
-        hash(db),
-        hash(form),
-        hash(REQUEST),
-        hash(doc),
-        hash(validation_mode)
-    )
-    cache = db.getRequestCache(cache_key)
-    if cache is not None:
-        return cache
-
     if hasattr(doc, 'real_id'):
         return doc
     else:
@@ -1078,7 +1066,6 @@ def getTemporaryDocument(db, form, REQUEST, doc=None, validation_mode=False):
                 REQUEST,
                 real_doc=doc,
                 validation_mode=validation_mode).__of__(db)
-        db.setRequestCache(cache_key, target)
         return target
 
 class TemporaryDocument(PlominoDocument):
