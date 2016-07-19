@@ -289,6 +289,8 @@ class DatagridField(BaseField):
     def getRenderedFields(self, editmode=True, creation=False, request={}):
         """ Return an array of rows rendered using the associated form fields
         """
+        logger.info("datagrid getRenderedFields before: %s" % self.context.id)
+
         if not self.field_mapping:
             return []
 
@@ -312,35 +314,33 @@ class DatagridField(BaseField):
                 request, 
                 validation_mode=False).__of__(db)
 
-        logger.info("datagrid getRenderedFields before: %s" % self.context.id)
-        ##from Products.zdb import set_trace
-        ##set_trace()
-
         # return rendered field for each mapped field if this one exists in the child form
-        child_forms = [
-            f.getFieldRender(child_form, target, editmode=editmode,
-                             creation=creation, request=request) for f in
-            [child_form.getFormField(f) for f in mapped_fields] if f]
 
-        xy = []
-        for f in mapped_fields:
-            ite = child_form.getFormField(f)
-            xy.append(ite)
+        #child_forms = [
+        #    f.getFieldRender(child_form, target, editmode=editmode,
+        #                     creation=creation, request=request) for f in
+        #    [child_form.getFormField(f) for f in mapped_fields] if f]
+
+        child_form_fields_list = []
+        for mapped_item in mapped_fields:
+            form_item = child_form.getFormField(mapped_item)
+            child_form_fields_list.append(form_item)
         child_form_fields = []
-        for h in xy:
-            if not h:
+        for list_item in child_form_fields_list:
+            if not list_item:
                 continue
-            jte = h.getFieldRender(child_form, target, editmode=editmode,
-                             creation=creation, request=request)
-            child_form_fields.append(jte)
-        logger.info("datagrid getRenderedFields first: %s" % child_forms)
+            subform_item = list_item.getFieldRender(
+                child_form,
+                target,
+                editmode=editmode,
+                creation=creation,
+                request=request)
+            child_form_fields.append(subform_item)
 
-        child_form_fields = [f.getFieldRender(child_form, target, editmode=editmode, creation=creation, request=request) for f in [child_form.getFormField(f) for f in mapped_fields] if f]
-        logger.info("datagrid getRenderedFields second: %s" %
-                    child_form_fields)
+        #child_form_fields = [f.getFieldRender(child_form, target, editmode=editmode, creation=creation, request=request) for f in [child_form.getFormField(f) for f in mapped_fields] if f]
         logger.info("datagrid getRenderedFields after: %s" % self.context.id)
-        from Products.zdb import set_trace
-        set_trace()
+        #from Products.zdb import set_trace
+        #set_trace()
         return json.dumps(child_form_fields)
 
     def getAssociateForm(self):
@@ -446,10 +446,16 @@ class DatagridField(BaseField):
         return {'rawdata': rawValue, 'rendered': fieldValue}
 
     def toRepeatingFieldId(self, fieldid):
+        logger.info("datagrid toRepeatingFieldId: %s %s" % (self.context.id,
+                                                            fieldid))
         parent_fieldname = self.context.id
         return "%s.%s:records" % (parent_fieldname, fieldid)
 
     def toSubforms(self, fieldValue, doc, editmode=True):
+        logger.info("datagrid toSubforms: %s %s" % (self.context.id,
+                                                    fieldValue))
+        from Products.zdb import set_trace
+        set_trace()
         if isinstance(fieldValue, dict):
             fieldValue = fieldValue['rawdata']
         child_form_id = self.associated_form

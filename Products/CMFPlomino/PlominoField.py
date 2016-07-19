@@ -302,8 +302,8 @@ class PlominoField(BaseContent, BrowserDefaultMixin):
         selection = self.getSettings().getSelectionList(target)
 
         from Products.zdb import set_trace
-        if self.id == 'items_list' or self.id == 'birthday':
-            set_trace()
+        #if self.id == 'items_list' or self.id == 'birthday':
+        #    set_trace()
 
         try:
             ## here is where the field is rendered
