@@ -123,6 +123,9 @@ class DatagridField(BaseField):
     def processInput(self, submittedValue):
         """
         """
+        logger.info("datagrid processInput: %s" % self.context.id)
+        ##from Products.zdb import set_trace
+        ##set_trace()
         db = self.context.getParentDatabase()
         child_form_id = self.associated_form
         # get associated form object
@@ -307,10 +310,37 @@ class DatagridField(BaseField):
                 db,
                 child_form,
                 request, 
-                validation_mode=False).__of__(db) 
+                validation_mode=False).__of__(db)
+
+        logger.info("datagrid getRenderedFields before: %s" % self.context.id)
+        ##from Products.zdb import set_trace
+        ##set_trace()
 
         # return rendered field for each mapped field if this one exists in the child form
+        child_forms = [
+            f.getFieldRender(child_form, target, editmode=editmode,
+                             creation=creation, request=request) for f in
+            [child_form.getFormField(f) for f in mapped_fields] if f]
+
+        xy = []
+        for f in mapped_fields:
+            ite = child_form.getFormField(f)
+            xy.append(ite)
+        child_form_fields = []
+        for h in xy:
+            if not h:
+                continue
+            jte = h.getFieldRender(child_form, target, editmode=editmode,
+                             creation=creation, request=request)
+            child_form_fields.append(jte)
+        logger.info("datagrid getRenderedFields first: %s" % child_forms)
+
         child_form_fields = [f.getFieldRender(child_form, target, editmode=editmode, creation=creation, request=request) for f in [child_form.getFormField(f) for f in mapped_fields] if f]
+        logger.info("datagrid getRenderedFields second: %s" %
+                    child_form_fields)
+        logger.info("datagrid getRenderedFields after: %s" % self.context.id)
+        from Products.zdb import set_trace
+        set_trace()
         return json.dumps(child_form_fields)
 
     def getAssociateForm(self):
@@ -323,6 +353,9 @@ class DatagridField(BaseField):
             creation=False, request=None):
         """
         """
+        logger.info("datagrid getFieldValue: %s" % self.context.id)
+        ##from Products.zdb import set_trace
+        ##set_trace()
         fieldValue = BaseField.getFieldValue(
                 self, form, doc, editmode_obsolete, creation, request)
         if not fieldValue:

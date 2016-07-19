@@ -257,6 +257,8 @@ class PlominoField(BaseContent, BrowserDefaultMixin):
                        fieldname_transform=None):
         """ Rendering the field
         """
+        logger.info("field getFieldRender: %s" % self.id)
+
         mode = self.getFieldMode()
         fieldname = self.id
         if fieldname_transform is not None:
@@ -299,7 +301,12 @@ class PlominoField(BaseContent, BrowserDefaultMixin):
 
         selection = self.getSettings().getSelectionList(target)
 
+        from Products.zdb import set_trace
+        if self.id == 'items_list' or self.id == 'birthday':
+            set_trace()
+
         try:
+            ## here is where the field is rendered
             html = pt(fieldname=fieldname,
                 fieldvalue=fieldvalue,
                 selection=selection,
