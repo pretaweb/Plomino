@@ -8,6 +8,7 @@
 #
 # Zope Public License (ZPL)
 #
+from itertools import chain
 
 __author__ = """Eric BREHAULT <eric.brehault@makina-corpus.org>"""
 __docformat__ = 'plaintext'
@@ -291,6 +292,24 @@ class PlominoView(ATFolder):
 
     # Methods
 
+    security.declarePublic('checkOnOpen')
+    def checkOnOpen(self):
+        if self.checkUserPermission(READ_PERMISSION):
+            valid = ''
+            try:
+                if self.getOnOpenView():
+                    valid = self.runFormulaScript(
+                            SCRIPT_ID_DELIMITER.join(['view', self.id, 'onopen']),
+                            self,
+                            self.getOnOpenView)
+            except PlominoScriptException, e:
+                e.reportError('onOpenView event failed')
+
+            if valid:
+                raise Unauthorized, valid
+        else:
+            raise Unauthorized, "You cannot read this content"
+
     security.declarePublic('checkBeforeOpenView')
     def checkBeforeOpenView(self):
         """ Check read permission and open view.
@@ -567,8 +586,8 @@ class PlominoView(ATFolder):
         for b in brains:
             row = []
             for column in columns:
-                column_value = getattr(b, self.getIndexKey(column.id))
-                rendered = column.getColumnRender(column_value)
+                column_value = getattr(b, column)
+                #rendered = column.getColumnRender(column_value)
                 if column_value is None:
                     column_value = ''
                 elif isinstance(column_value, basestring):
@@ -579,21 +598,41 @@ class PlominoView(ATFolder):
             rows.append(row)
         return rows
 
-    security.declareProtected(READ_PERMISSION, 'checkOnOpen')
-    def checkOnOpen(self):
-        if self.checkUserPermission(READ_PERMISSION):
-            valid = ''
-            try:
-                if self.getOnOpenView():
-                    valid = self.runFormulaScript(
-                            SCRIPT_ID_DELIMITER.join(['view', self.id, 'onopen']),
-                            self,
-                            self.getOnOpenView)
-            except PlominoScriptException, e:
-                e.reportError('onOpenView event failed')
+    def extract_datagrids(self, brain_docs):
+        # Need to extract any datagrid fields into their own csvs
+        db = self.getParentDatabase()
+        keycolumn = self.getKeyColumn()
+        if not keycolumn:
+            raise Exception("Can't use separate CSVs without a Key Column set")
+        keyindex = self.getIndexKey(keycolumn)
+        class FakeBrain(object):
+            def __init__(self, **attr):
+                self.__dict__ = attr
 
-            if valid:
-                return self.ErrorMessages(errors=[{'error': valid}])
+        for col in self.getColumns():
+            field = col.getSelectedField()
+            if not field:
+                continue
+            form_id, fieldname = field.split('/')
+            field = getattr(db.getForm(form_id), fieldname)
+            if not field or field.getFieldType() != 'DATAGRID':
+                continue
+            mapped_fields = [f.strip() for f in field.getSettings().field_mapping.split(',')]
+
+            fake_brains = []
+            for brain in brain_docs:
+                key = getattr(brain, keyindex)
+                if not key:
+                    #TODO: should probably log an error?
+                    #TODO: use object ids instead?
+                    continue
+                for row in getattr(brain, self.getIndexKey(col.id), ''):
+                    if not row:
+                        continue
+                    row = dict(zip([keycolumn]+mapped_fields, [key]+row))
+                    fake_brains.append(FakeBrain(**row))
+            yield (col, [keycolumn]+mapped_fields, fake_brains)
+
 
     security.declareProtected(READ_PERMISSION, 'exportCSV')
     def exportCSV(self,
@@ -609,9 +648,7 @@ class PlominoView(ATFolder):
         """
 
         # check security of object before opening
-        errormsg = self.checkOnOpen()
-        if errormsg:
-            return errormsg
+        self.checkOnOpen()
 
 
         if REQUEST:
@@ -645,7 +682,7 @@ class PlominoView(ATFolder):
             titles = [c.title.encode('utf-8') for c in columns]
             writer.writerow(titles)
 
-        rows = self.makeArray(brain_docs, columns)
+        rows = self.makeArray(brain_docs, [self.getIndexKey(c.id) for c in columns])
         writer.writerows(rows)
 
         if REQUEST:
@@ -663,26 +700,47 @@ class PlominoView(ATFolder):
             brain_docs=None,
             quotechar='"',
             quoting=csv.QUOTE_NONNUMERIC,
-            filename=''):
+            filename='',
+            datagrids='json'):
         """ Export CSV as ZIP
         """
 
         # check security of object before opening
-        errormsg = self.checkOnOpen()
-        if errormsg:
-            return errormsg
+        self.checkOnOpen()
 
         if REQUEST:
             if REQUEST.get("separator"):
                 separator = REQUEST.get("separator")
             if REQUEST.get("displayColumnsTitle"):
                 displayColumnsTitle = REQUEST.get("displayColumnsTitle")
-        data = self.exportCSV(None, displayColumnsTitle, separator, brain_docs, quotechar, quoting)
+        if brain_docs is None:
+            brain_docs = self.getAllDocuments(getObject=False)
+
+        datagrids = self.extract_datagrids(brain_docs) if datagrids=='separate' else []
+
         file_string = cStringIO.StringIO()
         zip_file = ZipFile(file_string, 'w', ZIP_DEFLATED)
         if not filename:
             filename = self.id
+
+        data = self.exportCSV(None, displayColumnsTitle, separator, brain_docs, quotechar, quoting)
         zip_file.writestr(filename + '.csv', data)
+
+        for column, mapped_names, brains in datagrids:
+            stream = cStringIO.StringIO()
+            writer = csv.writer(stream,
+                    delimiter=separator,
+                    quotechar=quotechar,
+                    quoting=quoting)
+            if displayColumnsTitle=='True' :
+                #TODO: should look up the full name from the field.
+                titles = [c.encode('utf-8') for c in mapped_names]
+                writer.writerow(titles)
+
+            writer.writerows(self.makeArray(brains, mapped_names))
+            zip_file.writestr(filename + '.%s'%column.id + '.csv', stream.getvalue())
+
+
         zip_file.close()
 
         if REQUEST:
@@ -692,9 +750,11 @@ class PlominoView(ATFolder):
                     'Content-Disposition', 'attachment; filename='+filename+'.zip')
         return file_string.getvalue()
 
+
     security.declareProtected(READ_PERMISSION, 'exportXLS')
     def exportXLS(self, REQUEST, displayColumnsTitle='False',
-            brain_docs=None):
+            brain_docs=None,
+            datagrids='json'):
         """ Export column values to an HTML table, and set content-type to
         launch Excel.
 
@@ -702,9 +762,8 @@ class PlominoView(ATFolder):
         """
 
         # check security of object before opening
-        errormsg = self.checkOnOpen()
-        if errormsg:
-            return errormsg 
+        self.checkOnOpen()
+
 
         if REQUEST:
             if REQUEST.get("displayColumnsTitle"):
@@ -716,7 +775,7 @@ class PlominoView(ATFolder):
         columns = [c for c in self.getColumns()
             if not getattr(c, 'HiddenColumn', False)]
 
-        rows = self.makeArray(brain_docs, columns)
+        rows = self.makeArray(brain_docs, [self.getIndexKey(c.id) for c in columns])
 
         # add column titles
         if displayColumnsTitle == 'True':
@@ -811,10 +870,13 @@ class PlominoView(ATFolder):
 
         return request_query
 
-    security.declarePublic('tojson')
+    security.declareProtected(READ_PERMISSION, 'tojson')
     def tojson(self, REQUEST=None):
         """ Returns a JSON representation of view data
         """
+        # check security of object before opening
+        self.checkOnOpen()
+
         data = []
         categorized = self.getCategorized()
         start = 1
