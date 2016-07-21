@@ -611,7 +611,7 @@ class PlominoView(ATFolder):
                     #TODO: use object ids instead?
                     continue
                 new_row = []
-                for row in getattr(brain, self.getIndexKey(col.id), ''):
+                for row in getattr(brain, col.id, ''):
                     if not row:
                         continue
                     for value in [key]+row:
