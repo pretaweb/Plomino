@@ -10,7 +10,7 @@
          show_single_year show_single_year | python: 1;
          show_jscal show_jscal | python: 1;
          input_name python:inputname[:-8] if inputname.endswith(':records') else inputname;
-         input_suffix python:':record:record' if inputname.endswith(':records') else ':record';
+         input_suffix python:':records:record' if inputname.endswith(':records') else ':record';
          input_id string:${formname}_${input_name};
          date_components_support_view context/@@date_components_support;
          values python:date_components_support_view.result(inputvalue, 0, starting_year, ending_year, future_years);
