@@ -844,7 +844,7 @@ class PlominoView(ATFolder):
 
         return request_query
 
-    security.declareProtected(READ_PERMISSION, 'tojson')
+    security.declarePublic('tojson')
     def tojson(self, REQUEST=None):
         """ Returns a JSON representation of view data
         """
