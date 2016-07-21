@@ -8,6 +8,7 @@
 #
 # Zope Public License (ZPL)
 #
+from itertools import chain
 
 __author__ = """Eric BREHAULT <eric.brehault@makina-corpus.org>"""
 __docformat__ = 'plaintext'
@@ -277,6 +278,7 @@ XLS_TABLE = """<html><head>
 
 TR = """<tr>%s</tr>"""
 TD = """<td>%s</td>"""
+
 
 class PlominoView(ATFolder):
     """
@@ -567,8 +569,8 @@ class PlominoView(ATFolder):
         for b in brains:
             row = []
             for column in columns:
-                column_value = getattr(b, self.getIndexKey(column.id))
-                rendered = column.getColumnRender(column_value)
+                column_value = getattr(b, column)
+                #rendered = column.getColumnRender(column_value)
                 if column_value is None:
                     column_value = ''
                 elif isinstance(column_value, basestring):
@@ -578,6 +580,47 @@ class PlominoView(ATFolder):
                 row.append(column_value)
             rows.append(row)
         return rows
+
+    def extract_datagrids(self, brain_docs, add_titles):
+        # Need to extract any datagrid fields into their own csvs
+        db = self.getParentDatabase()
+        keycolumn = self.getKeyColumn()
+        if not keycolumn:
+            raise Exception("Can't use separate CSVs without a Key Column set")
+        keyindex = self.getIndexKey(keycolumn)
+
+        for col in self.getColumns():
+            field = col.getSelectedField()
+            if not field:
+                continue
+            form_id, fieldname = field.split('/')
+            field = getattr(db.getForm(form_id), fieldname)
+            if not field or field.getFieldType() != 'DATAGRID':
+                continue
+            mapped_fields = [f.strip() for f in field.getSettings().field_mapping.split(',')]
+            new_rows = []
+            if add_titles:
+                #TODO: should look up the full name from the field.
+                titles = [c.encode('utf-8') for c in [keycolumn]+mapped_fields]
+                new_rows.append(titles)
+
+            for brain in brain_docs:
+                key = getattr(brain, keyindex)
+                if not key:
+                    #TODO: should probably log an error?
+                    #TODO: use object ids instead?
+                    continue
+                new_row = []
+                for row in getattr(brain, self.getIndexKey(col.id), ''):
+                    if not row:
+                        continue
+                    for value in [key]+row:
+                        value = '' if value is None else \
+                            value.encode('utf-8') if isinstance(value, basestring) else \
+                                unicode(value).encode('utf-8')
+                        new_row.append(value)
+                    new_rows.append(new_row)
+            yield (col.id, new_rows)
 
     security.declareProtected(READ_PERMISSION, 'exportCSV')
     def exportCSV(self,
@@ -622,7 +665,7 @@ class PlominoView(ATFolder):
             titles = [c.title.encode('utf-8') for c in columns]
             writer.writerow(titles)
 
-        rows = self.makeArray(brain_docs, columns)
+        rows = self.makeArray(brain_docs, [self.getIndexKey(c.id) for c in columns])
         writer.writerows(rows)
 
         if REQUEST:
@@ -640,7 +683,8 @@ class PlominoView(ATFolder):
             brain_docs=None,
             quotechar='"',
             quoting=csv.QUOTE_NONNUMERIC,
-            filename=''):
+            filename='',
+            datagrids='json'):
         """ Export CSV as ZIP
         """
         if REQUEST:
@@ -648,12 +692,30 @@ class PlominoView(ATFolder):
                 separator = REQUEST.get("separator")
             if REQUEST.get("displayColumnsTitle"):
                 displayColumnsTitle = REQUEST.get("displayColumnsTitle")
-        data = self.exportCSV(None, displayColumnsTitle, separator, brain_docs, quotechar, quoting)
+        if brain_docs is None:
+            brain_docs = self.getAllDocuments(getObject=False)
+
+        datagrids = self.extract_datagrids(brain_docs, displayColumnsTitle=='True') \
+            if datagrids=='separate' else []
+
         file_string = cStringIO.StringIO()
         zip_file = ZipFile(file_string, 'w', ZIP_DEFLATED)
         if not filename:
             filename = self.id
+
+        data = self.exportCSV(None, displayColumnsTitle, separator, brain_docs, quotechar, quoting)
         zip_file.writestr(filename + '.csv', data)
+
+        for name, rows in datagrids:
+            stream = cStringIO.StringIO()
+            writer = csv.writer(stream,
+                    delimiter=separator,
+                    quotechar=quotechar,
+                    quoting=quoting)
+            writer.writerows(rows)
+            zip_file.writestr(filename + '.%s'%name + '.csv', stream.getvalue())
+
+
         zip_file.close()
 
         if REQUEST:
@@ -663,14 +725,18 @@ class PlominoView(ATFolder):
                     'Content-Disposition', 'attachment; filename='+filename+'.zip')
         return file_string.getvalue()
 
+
     security.declareProtected(READ_PERMISSION, 'exportXLS')
     def exportXLS(self, REQUEST, displayColumnsTitle='False',
-            brain_docs=None):
+            brain_docs=None,
+            ):
         """ Export column values to an HTML table, and set content-type to
         launch Excel.
 
         IMPORTANT: brain_docs are supposed to be ZCatalog brains
         """
+        #TODO: should be changed to XLSX - see https://blogs.msdn.microsoft.com/dmahugh/2006/07/15/createxlsx-sample-program/
+        # or using a library
         if REQUEST:
             if REQUEST.get("displayColumnsTitle"):
                 displayColumnsTitle = REQUEST.get("displayColumnsTitle")
@@ -681,13 +747,15 @@ class PlominoView(ATFolder):
         columns = [c for c in self.getColumns()
             if not getattr(c, 'HiddenColumn', False)]
 
-        rows = self.makeArray(brain_docs, columns)
-
+        rows = self.makeArray(brain_docs, [self.getIndexKey(c.id) for c in columns])
         # add column titles
         if displayColumnsTitle == 'True':
             titles = [c.title.encode('utf-8') for c in self.getColumns()
                 if not getattr(c, 'HiddenColumn', False)]
             rows = [titles] + rows
+
+        #grids = list(self.extract_datagrids(brain_docs, displayColumnsTitle == 'True')) \
+        #    if datagrids=='separate' else []
 
         html = XLS_TABLE % (
                 ''.join([TR %
@@ -776,7 +844,7 @@ class PlominoView(ATFolder):
 
         return request_query
 
-    security.declarePublic('tojson')
+    security.declareProtected(READ_PERMISSION, 'tojson')
     def tojson(self, REQUEST=None):
         """ Returns a JSON representation of view data
         """
