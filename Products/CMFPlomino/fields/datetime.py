@@ -15,6 +15,7 @@ import logging
 logger = logging.getLogger('Plomino')
 
 # Zope
+from DateTime import DateTime
 from zope.formlib import form
 from zope.interface import implements
 from zope.schema import getFields
@@ -233,6 +234,11 @@ class DatetimeField(BaseField):
         """
         """
         logger.info("processInput")
+        ##from Products.zdb import set_trace
+        ##set_trace()
+        if isinstance(submittedValue, DateTime):
+            return submittedValue
+
         if isinstance(submittedValue, basestring):
             submittedValue = submittedValue.strip()
             try:
