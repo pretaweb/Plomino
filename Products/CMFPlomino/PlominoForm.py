@@ -42,6 +42,7 @@ from Products.CMFPlomino.PlominoUtils import DateToString
 from Products.CMFPlomino.PlominoUtils import StringToDate
 from Products.CMFPlomino.PlominoUtils import PlominoTranslate
 from Products.CMFPlomino.PlominoUtils import translate
+from Products.CMFPlomino.PlominoUtils import mergeRecordInRecords
 import interfaces
 from pyquery import PyQuery as pq
 
@@ -1673,11 +1674,16 @@ class PlominoForm(ATFolder):
                     applyhidewhen=True,
                     request=REQUEST)
 
+        logger.info("form readInputs: %s" % self.id)
+
         for f in all_fields:
             mode = f.getFieldMode()
             fieldName = f.id
+            if fieldName == "items_list":
+                from Products.zdb import set_trace
+                set_trace()
             if mode == "EDITABLE":
-                submittedValue = REQUEST.get(fieldName)
+                submittedValue = mergeRecordInRecords(REQUEST, fieldName)
                 if submittedValue is not None:
                     if submittedValue=='':
                         doc.removeItem(fieldName)
@@ -1800,6 +1806,9 @@ class PlominoForm(ATFolder):
     def validation_errors(self, REQUEST):
         """ Check submitted values
         """
+        logger.info("form validation_errors: %s" % self.id)
+        ## from Products.zdb import set_trace
+        ## set_trace()
         # For a multi page form, don't validate if moving backwards
         if self.getIsMulti() and REQUEST.get('plomino_clicked_name') == 'back':
             errors = []

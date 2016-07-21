@@ -124,8 +124,8 @@ class DatagridField(BaseField):
         """
         """
         logger.info("datagrid processInput: %s" % self.context.id)
-        ##from Products.zdb import set_trace
-        ##set_trace()
+        from Products.zdb import set_trace
+        set_trace()
         db = self.context.getParentDatabase()
         child_form_id = self.associated_form
         # get associated form object
@@ -454,8 +454,8 @@ class DatagridField(BaseField):
     def toSubforms(self, fieldValue, doc, editmode=True):
         logger.info("datagrid toSubforms: %s %s" % (self.context.id,
                                                     fieldValue))
-        from Products.zdb import set_trace
-        set_trace()
+        ##from Products.zdb import set_trace
+        ##set_trace()
         if isinstance(fieldValue, dict):
             fieldValue = fieldValue['rawdata']
         child_form_id = self.associated_form

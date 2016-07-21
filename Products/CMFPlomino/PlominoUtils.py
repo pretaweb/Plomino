@@ -516,6 +516,52 @@ def save_point():
     txn.savepoint(optimistic=True)
 
 
+def mergeRecordInRecords(request, field):
+    """ Merge record field within record field from request
+
+    :param request: Zope's ZPublisher HTTPRequest objects
+    :param field: field name that need to be merged
+    :return: field value
+    """
+    if not field:
+        # TypeError: object of type 'NoneType' has no len()
+        return
+
+    field_char_length = len(field)
+    field_records = field + '.'
+    key_record = {}
+
+    try:
+        field_value = request.form.get(field)
+    except AttributeError:
+        # AttributeError: 'dict' object has no attribute 'form'
+        return request.get(field)
+
+    if not isinstance(field_value, list):
+        return field_value
+
+    for key in request.form.keys():
+        if not key.startswith(field_records):
+            continue
+        key_name = key[field_char_length + 1:]
+        if not key_name:
+            continue
+        key_record[key_name] = request.form.get(key)
+
+    from Products.zdb import set_trace
+    set_trace()
+
+    for index in range(len(field_value)):
+        # field_value is a list of 'record' object
+        # refer from ZPublisher.HTTPRequest for more info
+        for name, value in key_record.items():
+            if index >= len(value):
+                break
+            setattr(field_value[index], name, value[index])
+
+    return field_value
+
+
 def _expandIncludes(context, formula):
     """ Recursively expand include statements
     """
