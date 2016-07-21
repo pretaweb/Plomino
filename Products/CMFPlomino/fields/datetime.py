@@ -233,9 +233,6 @@ class DatetimeField(BaseField):
     def processInput(self, submittedValue):
         """
         """
-        logger.info("processInput")
-        ##from Products.zdb import set_trace
-        ##set_trace()
         if isinstance(submittedValue, DateTime):
             return submittedValue
 
@@ -287,10 +284,6 @@ class DatetimeField(BaseField):
             creation=False, request=None):
         """
         """
-        logger.info("datetime getFieldValue: %s" % self.context.id)
-        ##from Products.zdb import set_trace
-        ##if self.context.id == 'birthday':
-        ##    set_trace()
         fieldValue = BaseField.getFieldValue(
                 self, form, doc, editmode_obsolete, creation, request)
 

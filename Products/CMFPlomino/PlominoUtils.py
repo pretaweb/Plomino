@@ -548,9 +548,6 @@ def mergeRecordInRecords(request, field):
             continue
         key_record[key_name] = request.form.get(key)
 
-    from Products.zdb import set_trace
-    set_trace()
-
     for index in range(len(field_value)):
         # field_value is a list of 'record' object
         # refer from ZPublisher.HTTPRequest for more info

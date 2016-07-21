@@ -865,9 +865,6 @@ class PlominoForm(ATFolder):
                 request.set('parent_form_ids', parent_form_ids)
 
         # get the field lists
-        logger.info("form displayDocument: %s" % parent_form_id)
-        ##from Products.zdb import set_trace
-        ##set_trace()
         fields = self.getFormFields(doc=doc, request=request)
         fields_in_layout = []
         fieldids_not_in_layout = []
@@ -1674,14 +1671,9 @@ class PlominoForm(ATFolder):
                     applyhidewhen=True,
                     request=REQUEST)
 
-        logger.info("form readInputs: %s" % self.id)
-
         for f in all_fields:
             mode = f.getFieldMode()
             fieldName = f.id
-            if fieldName == "items_list":
-                from Products.zdb import set_trace
-                set_trace()
             if mode == "EDITABLE":
                 submittedValue = mergeRecordInRecords(REQUEST, fieldName)
                 if submittedValue is not None:
@@ -1806,9 +1798,6 @@ class PlominoForm(ATFolder):
     def validation_errors(self, REQUEST):
         """ Check submitted values
         """
-        logger.info("form validation_errors: %s" % self.id)
-        ## from Products.zdb import set_trace
-        ## set_trace()
         # For a multi page form, don't validate if moving backwards
         if self.getIsMulti() and REQUEST.get('plomino_clicked_name') == 'back':
             errors = []
