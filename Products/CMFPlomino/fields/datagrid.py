@@ -286,8 +286,6 @@ class DatagridField(BaseField):
     def getRenderedFields(self, editmode=True, creation=False, request={}):
         """ Return an array of rows rendered using the associated form fields
         """
-        logger.info("datagrid getRenderedFields before: %s" % self.context.id)
-
         if not self.field_mapping:
             return []
 
@@ -415,8 +413,6 @@ class DatagridField(BaseField):
         return {'rawdata': rawValue, 'rendered': fieldValue}
 
     def toRepeatingFieldId(self, fieldid):
-        logger.info("datagrid toRepeatingFieldId: %s %s" % (self.context.id,
-                                                            fieldid))
         parent_fieldname = self.context.id
         return "%s.%s:records" % (parent_fieldname, fieldid)
 
