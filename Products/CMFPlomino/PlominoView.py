@@ -611,6 +611,10 @@ class PlominoView(ATFolder):
                     #TODO: use object ids instead?
                     continue
                 new_row = []
+                rows = getattr(brain, col.id, '')
+                if not isinstance(rows, list):
+                    # This could be due to there being no data saved
+                    continue
                 for row in getattr(brain, col.id, ''):
                     if not row:
                         continue
