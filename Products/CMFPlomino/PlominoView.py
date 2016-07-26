@@ -597,31 +597,38 @@ class PlominoView(ATFolder):
             field = getattr(db.getForm(form_id), fieldname)
             if not field or field.getFieldType() != 'DATAGRID':
                 continue
-            mapped_fields = [f.strip() for f in field.getSettings().field_mapping.split(',')]
+            mapped_fields = [f.strip()
+                             for f in
+                             field.getSettings().field_mapping.split(',')]
             new_rows = []
             if add_titles:
-                #TODO: should look up the full name from the field.
+                # TODO: should look up the full name from the field.
                 titles = [c.encode('utf-8') for c in [keycolumn]+mapped_fields]
                 new_rows.append(titles)
 
+            selected_field = getattr(col, 'SelectedField', None)
+            if not selected_field:
+                continue
+            fieldPath = selected_field.split('/')[-1]
             for brain in brain_docs:
                 key = getattr(brain, keyindex)
                 if not key:
-                    #TODO: should probably log an error?
-                    #TODO: use object ids instead?
+                    # TODO: should probably log an error?
+                    # TODO: use object ids instead?
                     continue
-                rows = getattr(brain, col.id, '')
+                rows = getattr(brain, fieldPath, '')
                 if not isinstance(rows, list):
                     # This could be due to there being no data saved
                     continue
-                for row in getattr(brain, col.id, ''):
+                for row in rows:
                     new_row = []
                     if not row:
                         continue
                     for value in [key]+row:
                         value = '' if value is None else \
-                            value.encode('utf-8') if isinstance(value, basestring) else \
-                                unicode(value).encode('utf-8')
+                            value.encode('utf-8') if \
+                            isinstance(value, basestring) else \
+                            unicode(value).encode('utf-8')
                         new_row.append(value)
                     new_rows.append(new_row)
             yield (col.id, new_rows)
