@@ -1,5 +1,5 @@
 <span tal:define="widget python:options['field'].getSettings('widget');
-                unique python:str(random.choice(xrange(10)));
+                unique python:str(DateTime().millis());
 				selection options/selection" 
 				tal:attributes="class python:options['fieldname'] + '-' + 'selectionfield'">
 	<tal:widget tal:condition="python:test(widget=='SELECT')">
