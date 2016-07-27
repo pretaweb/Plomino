@@ -59,7 +59,8 @@
                 show python:index < row_count"
                  tal:condition="show"
                  tal:attributes="id string:repeat-${fieldname}-${index};">
-                    <h2 tal:content="string:${fieldname} ${repeat/subform/number}"></h2>
+                    <!-- <h2 tal:content="string:${fieldname}
+                            ${repeat/subform/number}"></h2> -->
                     <tal:block tal:replace="structure subform"/>
 
             </div>

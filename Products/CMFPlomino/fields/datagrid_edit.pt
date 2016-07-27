@@ -166,7 +166,8 @@
                                  style python:'display:none' if not show else ''">
                 <fieldset aria-hidden="false"
                         tal:attributes="aria-hidden not:show">
-                    <legend tal:content="string:${fieldname} ${repeat/subform/number}"></legend>
+                    <!-- <legend tal:content="string:${fieldname}
+                            ${repeat/subform/number}"></legend>  -->
                     <tal:block tal:replace="structure subform"/>
 
                 </fieldset>
