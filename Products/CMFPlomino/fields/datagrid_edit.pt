@@ -163,6 +163,7 @@
                             show python:index == 0 or index < row_count;
                             show_next python: index < row_count-1"
                  tal:attributes="id string:repeat-${fieldname}-${index};
+                                 class string:repeat-subform;
                                  style python:'display:none' if not show else ''">
                 <fieldset aria-hidden="false"
                         tal:attributes="aria-hidden not:show">
