@@ -575,6 +575,49 @@ A Doclink field allows to create a reference to another document::
     >>> """<option value="%s">ola</option>""" % (doc4.id) in result
     True
 
+
+A file field
+
+
+    >>> id = db.frm2.invokeFactory('PlominoField',
+    ...         id='myfiles',
+    ...         Title='Related artist',
+    ...         FieldType="ATTACHMENT",
+    ...         FieldMode="EDITABLE")
+    >>> db.frm2.myfiles.at_post_create_script()
+    >>> from Products.CMFPlomino.fields.attachment import IAttachmentField
+    >>> adapted = IAttachmentField(db.frm2.myfiles)
+    >>> db.frm2.setFormLayout(
+    ... """10 <p>My Files:
+    ... <span class="plominoFieldClass">myfiles</span></p>""")
+    >>> db.cleanRequestCache()
+    >>> result = db.frm2.displayDocument(None, True, True)
+    >>> print result
+    <input type='hidden' name='Form' value='frm2' />10 <p>My Files:
+    <input type="file" id="myfiles" name="myfiles" />
+    </p>
+
+
+    >>> browser = Browser(layer['app'])
+    >>> transaction.commit()  # enable the browser to see our changes
+    >>> browser.open(db.absolute_url())
+    >>> browser.getLink('Log in').click()
+    >>> browser.getControl('Login Name').value = 'admin'
+    >>> browser.getControl('Password').value = 'secret'
+    >>> browser.getControl('Log in').click()
+
+    >>> browser.open(db.frm2.absolute_url())
+    >>> file_upload_ctl = browser.getControl(name='myfiles')
+    >>> import os
+    >>> #test_file = os.path.join(os.path.dirname(__file__), "plomino.txt")
+    >>> #file_upload_ctl.add_file(open(test_file), 'text/plain',  'plomino.txt')
+    >>> browser.getControl(name='plomino_save').click()
+
+    >>> browser.getLink('plomino_file_attachment.txt').click()
+    >>> print browser.contents
+
+
+
 A field can be computed::
 
     >>> id = db.frm2.invokeFactory('PlominoField',
