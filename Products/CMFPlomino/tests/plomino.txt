@@ -597,25 +597,25 @@ A file field
     <input type="file" id="myfiles" name="myfiles" />
     </p>
 
-
+    >>> import os
+    >>> test_file = os.path.join(os.path.dirname(__file__),
+    ...                                          "plomino_file_attachment.txt")
+    >>> doc6 = db.createDocument()
+    >>> doc6.setItem('Form', 'frm2')
+    >>> (d6file, d6type) = doc6.setfile(open(test_file).read(),
+    ...                                 filename='plomino_file_attachment.txt',
+    ...                                 contenttype='text/plain')
+    >>> doc6.setItem('myfiles', {'plomino_file_attachment.txt': 'text/plain'})
     >>> browser = Browser(layer['app'])
     >>> transaction.commit()  # enable the browser to see our changes
-    >>> browser.open(db.absolute_url())
+    >>> browser.open(doc6.absolute_url())
     >>> browser.getLink('Log in').click()
     >>> browser.getControl('Login Name').value = 'admin'
     >>> browser.getControl('Password').value = 'secret'
     >>> browser.getControl('Log in').click()
-
-    >>> browser.open(db.frm2.absolute_url())
-    >>> file_upload_ctl = browser.getControl(name='myfiles')
-    >>> import os
-    >>> #test_file = os.path.join(os.path.dirname(__file__), "plomino.txt")
-    >>> #file_upload_ctl.add_file(open(test_file), 'text/plain',  'plomino.txt')
-    >>> browser.getControl(name='plomino_save').click()
-
     >>> browser.getLink('plomino_file_attachment.txt').click()
     >>> print browser.contents
-
+    this is the attachment
 
 
 A field can be computed::
