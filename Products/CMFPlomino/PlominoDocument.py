@@ -808,13 +808,7 @@ class PlominoDocument(CatalogAware, CMFBTreeFolder, Contained):
             return None
         if asFile:
             return file_obj
-        iterator = file_obj.index_html(REQUEST, REQUEST.RESPONSE)
-
-        if REQUEST:
-            #TODO: check if this will replace the existing header
-            REQUEST.RESPONSE.setHeader(
-                "Content-Disposition", "inline; filename=" + filename)
-        return iterator
+        return file_obj.index_html()
 
     security.declareProtected(READ_PERMISSION, 'getFilenames')
     def getFilenames(self):
