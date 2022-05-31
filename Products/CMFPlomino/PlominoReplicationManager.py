@@ -16,12 +16,19 @@ from xml.dom.minidom import parseString
 from xml.parsers.expat import ExpatError
 import base64
 import codecs
+import collections
 import csv
 import decimal
 import glob
 import os
+from six import iteritems
+from io import BytesIO
 import transaction
 import xmlrpclib
+try:
+    collections_abc = collections.abc
+except AttributeError:
+    collections_abc = collections
 
 import logging
 logger = logging.getLogger("Replication")
@@ -100,6 +107,19 @@ def dump_decimal(self, value, write):
         'decimal': str(value),
         }
     self.dump_struct(value, write)
+
+def safe_dict(data):
+    if isinstance(data, str):
+        return data
+    elif isinstance(data, unicode):
+        return data.encode("utf-8")
+    elif isinstance(data, collections_abc.Mapping):
+        return {k: safe_dict(v) for k, v in iteritems(data)}
+    elif isinstance(data, list):
+        return [safe_dict(value) for value in data]
+        # return type(data)(map(safe_dict, data))
+    else:
+        return data
 
 xmlrpclib.Marshaller.dispatch[plomino_decimal] = dump_decimal
 xmlrpclib.Marshaller.dispatch[decimal.Decimal] = dump_decimal
@@ -1272,6 +1292,12 @@ class PlominoReplicationManager(Persistent):
                 REQUEST.RESPONSE.setHeader('content-type', 'text/xml')
             return xmldoc.toxml()
 
+        if targettype == 'csv':
+            csv = self.exportDocumentsAsCSV(docids)
+            if REQUEST is not None:
+                REQUEST.RESPONSE.setHeader('content-type', 'text/csv')
+            return csv
+
         if targettype == 'folder':
             if REQUEST:
                 targetfolder = REQUEST.get('targetfolder')
@@ -1303,6 +1329,45 @@ class PlominoReplicationManager(Persistent):
         fileobj = codecs.open(path, "w", "utf-8")
         fileobj.write(content)
         fileobj.close()
+
+    security.declareProtected(READ_PERMISSION, 'exportDocumentAsCSV')
+    def exportDocumentsAsCSV(self, docids=None):
+        forms = self.getForms()
+        fieldnames = ["doc_id"]
+        added_fieldnames = []
+
+        for form in forms:
+            for field in form.getFormFields():
+                if field.id not in fieldnames:
+                    fieldnames.append(field.id)
+
+        if docids:
+            docs = [self.getDocument(i) for i in docids]
+        else:
+            docs = self.getAllDocuments()
+
+        doc_dicts = []
+        for i, doc in enumerate(docs):
+            doc_dict = {"doc_id": doc.id}
+
+            for field_name in doc.getItems():
+                if field_name not in fieldnames:
+                    fieldnames.append(field_name)
+                    added_fieldnames.append(field_name)
+
+            doc_dict.update(doc.items)
+            doc_dicts.append(safe_dict(doc_dict))
+
+            # Optimisation to keep memory usage low.
+            #   We don't need transactions for an export.
+            if i % 2000 == 0:
+                transaction.abort()
+
+        csvfile = BytesIO()
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(doc_dicts)
+        return csvfile.getvalue().decode("utf-8")
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
     def exportDocumentAsXML(self, xmldoc, doc):
