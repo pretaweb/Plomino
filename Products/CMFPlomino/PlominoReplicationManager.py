@@ -34,6 +34,7 @@ import logging
 logger = logging.getLogger("Replication")
 
 # Zope
+from App.config import getConfiguration
 from Acquisition import *
 from AccessControl.requestmethod import postonly
 from DateTime import DateTime
@@ -1294,9 +1295,20 @@ class PlominoReplicationManager(Persistent):
 
         if targettype == 'csv':
             csv = self.exportDocumentsAsCSV(docids)
-            if REQUEST is not None:
-                REQUEST.RESPONSE.setHeader('content-type', 'text/csv')
-            return csv
+            # Used for returning the CSV to the user. Not currently used due to size.
+            # if REQUEST is not None:
+            #     REQUEST.RESPONSE.setHeader('content-type', 'text/csv')
+            # return csv
+            zope_export_folder_path = getattr(getConfiguration(), 'clienthome', "")
+            export_folder_path = os.path.join(zope_export_folder_path, 'export', self.id)
+            export_path = os.path.join(export_folder_path, '%s.csv' % self.id)
+            if os.path.isdir(export_folder_path):
+                # remove previous export
+                os.remove(export_path)
+            else:
+                os.makedirs(export_folder_path)
+
+            self.saveFile(export_path, csv)
 
         if targettype == 'folder':
             if REQUEST:
@@ -1330,7 +1342,7 @@ class PlominoReplicationManager(Persistent):
         fileobj.write(content)
         fileobj.close()
 
-    security.declareProtected(READ_PERMISSION, 'exportDocumentAsCSV')
+    security.declareProtected(READ_PERMISSION, 'exportDocumentsAsCSV')
     def exportDocumentsAsCSV(self, docids=None):
         forms = self.getForms()
         fieldnames = ["doc_id"]
