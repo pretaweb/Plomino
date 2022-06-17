@@ -1344,9 +1344,19 @@ class PlominoReplicationManager(Persistent):
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentsAsCSV')
     def exportDocumentsAsCSV(self, docids=None):
+        # Returns a tuple of ({doc_data}, [new_field_names]) 
+        def _iterate_documents(docs):
+            for i, doc in enumerate(docs):
+                doc_dict = {"doc_id": doc.id}
+                doc_dict.update(doc.items)
+
+                if i % 2000 == 0:
+                    transaction.abort()
+
+                yield safe_dict(doc_dict)
+
         forms = self.getForms()
         fieldnames = ["doc_id"]
-        added_fieldnames = []
 
         for form in forms:
             for field in form.getFormFields():
@@ -1358,27 +1368,29 @@ class PlominoReplicationManager(Persistent):
         else:
             docs = self.getAllDocuments()
 
-        doc_dicts = []
-        for i, doc in enumerate(docs):
-            doc_dict = {"doc_id": doc.id}
-
+        # Iterating over this twice is a bit of a waste, but
+        #   is needed to get all the fieldnames before we start
+        #   iterating over the documents.
+        for j, doc in enumerate(docs):
             for field_name in doc.getItems():
                 if field_name not in fieldnames:
                     fieldnames.append(field_name)
-                    added_fieldnames.append(field_name)
 
-            doc_dict.update(doc.items)
-            doc_dicts.append(safe_dict(doc_dict))
-
-            # Optimisation to keep memory usage low.
-            #   We don't need transactions for an export.
-            if i % 2000 == 0:
+            if j % 20000 == 0:
                 transaction.abort()
 
         csvfile = BytesIO()
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(doc_dicts)
+
+        transaction.abort()
+
+        logger.info("Exporting %s documents" % len(docs))
+
+        for row in _iterate_documents(docs):
+            writer.writerow(row)
+
+        # writer.writerows(doc_dicts)
         return csvfile.getvalue().decode("utf-8")
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
