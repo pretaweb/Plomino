@@ -1344,17 +1344,7 @@ class PlominoReplicationManager(Persistent):
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentsAsCSV')
     def exportDocumentsAsCSV(self, docids=None):
-        # Returns a tuple of ({doc_data}, [new_field_names]) 
-        def _iterate_documents(docs):
-            for i, doc in enumerate(docs):
-                doc_dict = {"doc_id": doc.id}
-                doc_dict.update(doc.items)
-
-                if i % 2000 == 0:
-                    transaction.abort()
-
-                yield safe_dict(doc_dict)
-
+        logger.info("Starting documents CSV export...")
         forms = self.getForms()
         fieldnames = ["doc_id"]
 
@@ -1368,6 +1358,23 @@ class PlominoReplicationManager(Persistent):
         else:
             docs = self.getAllDocuments()
 
+        number_of_docs = len(docs)
+        logger.info("Exporting %s documents..." % number_of_docs)
+
+        # Returns a tuple of ({doc_data}, [new_field_names]) 
+        def _iterate_documents(doc_list):
+            for i, doc in enumerate(doc_list):
+                doc_dict = {"doc_id": doc.id}
+                doc_dict.update(doc.items)
+
+                if i % 2000 == 0:
+                    transaction.abort()
+                if i % 20000 == 0:
+                    print("Documents exported: %s/%s" % (i, number_of_docs))
+                    logger.info("Documents exported: %s/%s" % (i, number_of_docs))
+
+                yield safe_dict(doc_dict)
+
         # Iterating over this twice is a bit of a waste, but
         #   is needed to get all the fieldnames before we start
         #   iterating over the documents.
@@ -1377,18 +1384,24 @@ class PlominoReplicationManager(Persistent):
                     fieldnames.append(field_name)
 
             if j % 20000 == 0:
+                print("Fieldnames checked: %s/%s" % (j, number_of_docs))
+                logger.info("Fieldnames checked: %s/%s" % (j, number_of_docs))
                 transaction.abort()
+
+        transaction.abort()
+        logger.info("All fieldnames checked. Starting document writing")
 
         csvfile = BytesIO()
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
-        transaction.abort()
-
-        logger.info("Exporting %s documents" % len(docs))
+        transaction.abort() 
 
         for row in _iterate_documents(docs):
             writer.writerow(row)
+
+        transaction.abort()
+        logger.info("All documents written. Returning CSV")
 
         # writer.writerows(doc_dicts)
         return csvfile.getvalue().decode("utf-8")
