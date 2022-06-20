@@ -1351,34 +1351,28 @@ class PlominoReplicationManager(Persistent):
         for form in forms:
             for field in form.getFormFields():
                 if field.id not in fieldnames:
+                    print("Adding field %s" % field.id)
                     fieldnames.append(field.id)
 
         if docids:
-            docs = [self.getDocument(i) for i in docids]
+            doc_ids = [self.getDocument(i) for i in docids]
         else:
-            docs = self.getAllDocuments()
+            doc_ids = self.documents.keys()
 
-        number_of_docs = len(docs)
+        number_of_docs = len(doc_ids)
         logger.info("Exporting %s documents..." % number_of_docs)
 
         # Returns a tuple of ({doc_data}, [new_field_names]) 
-        def _iterate_documents(doc_list):
-            for i, doc in enumerate(doc_list):
-                doc_dict = {"doc_id": doc.id}
-                doc_dict.update(doc.items)
-
+        def _iterate_documents(doc_ids_list):
+            for i, doc_id in enumerate(doc_ids_list):
                 if i % 2000 == 0:
                     transaction.abort()
-                if i % 20000 == 0:
-                    print("Documents exported: %s/%s" % (i, number_of_docs))
-                    logger.info("Documents exported: %s/%s" % (i, number_of_docs))
-
-                yield safe_dict(doc_dict)
+                yield self.documents[doc_id]
 
         # Iterating over this twice is a bit of a waste, but
         #   is needed to get all the fieldnames before we start
         #   iterating over the documents.
-        for j, doc in enumerate(docs):
+        for j, doc in enumerate(_iterate_documents(doc_ids)):
             for field_name in doc.getItems():
                 if field_name not in fieldnames:
                     fieldnames.append(field_name)
@@ -1386,7 +1380,6 @@ class PlominoReplicationManager(Persistent):
             if j % 20000 == 0:
                 print("Fieldnames checked: %s/%s" % (j, number_of_docs))
                 logger.info("Fieldnames checked: %s/%s" % (j, number_of_docs))
-                transaction.abort()
 
         transaction.abort()
         logger.info("All fieldnames checked. Starting document writing")
@@ -1397,7 +1390,15 @@ class PlominoReplicationManager(Persistent):
 
         transaction.abort() 
 
-        for row in _iterate_documents(docs):
+        for i, doc in enumerate(_iterate_documents(doc_ids)):
+            doc_dict = {"doc_id": doc.id}
+            doc_dict.update(doc.items)
+
+            if i % 20000 == 0:
+                print("Documents exported: %s/%s" % (i, number_of_docs))
+                logger.info("Documents exported: %s/%s" % (i, number_of_docs))
+
+            row = safe_dict(doc_dict)
             writer.writerow(row)
 
         transaction.abort()
