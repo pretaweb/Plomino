@@ -1294,21 +1294,7 @@ class PlominoReplicationManager(Persistent):
             return xmldoc.toxml()
 
         if targettype == 'csv':
-            csv = self.exportDocumentsAsCSV(docids)
-            # Used for returning the CSV to the user. Not currently used due to size.
-            # if REQUEST is not None:
-            #     REQUEST.RESPONSE.setHeader('content-type', 'text/csv')
-            # return csv
-            zope_export_folder_path = getattr(getConfiguration(), 'clienthome', "")
-            export_folder_path = os.path.join(zope_export_folder_path, 'export', self.id)
-            export_path = os.path.join(export_folder_path, '%s.csv' % self.id)
-            if os.path.isdir(export_folder_path):
-                # remove previous export
-                os.remove(export_path)
-            else:
-                os.makedirs(export_folder_path)
-
-            self.saveFile(export_path, csv)
+            self.exportDocumentsAsCSV(docids)
 
         if targettype == 'folder':
             if REQUEST:
@@ -1351,7 +1337,6 @@ class PlominoReplicationManager(Persistent):
         for form in forms:
             for field in form.getFormFields():
                 if field.id not in fieldnames:
-                    print("Adding field %s" % field.id)
                     fieldnames.append(field.id)
 
         if docids:
@@ -1375,6 +1360,7 @@ class PlominoReplicationManager(Persistent):
         for j, doc in enumerate(_iterate_documents(doc_ids)):
             for field_name in doc.getItems():
                 if field_name not in fieldnames:
+                    print("Adding field %s" % field_name)
                     fieldnames.append(field_name)
 
             if j % 20000 == 0:
@@ -1385,27 +1371,39 @@ class PlominoReplicationManager(Persistent):
         logger.info("All fieldnames checked. Starting document writing")
 
         csvfile = BytesIO()
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
+        # Used for returning the CSV to the user. Not currently used due to size.
+        # if REQUEST is not None:
+        #     REQUEST.RESPONSE.setHeader('content-type', 'text/csv')
+        # return csv
+        zope_export_folder_path = getattr(getConfiguration(), 'clienthome', "")
+        export_folder_path = os.path.join(zope_export_folder_path, 'export', self.id)
+        export_path = os.path.join(export_folder_path, '%s.csv' % self.id)
+        if os.path.isdir(export_folder_path):
+            # remove previous export
+            os.remove(export_path)
+        else:
+            os.makedirs(export_folder_path)
 
-        transaction.abort() 
+        with codecs.open(export_path, "w", "utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
 
-        for i, doc in enumerate(_iterate_documents(doc_ids)):
-            doc_dict = {"doc_id": doc.id}
-            doc_dict.update(doc.items)
+            transaction.abort() 
 
-            if i % 20000 == 0:
-                print("Documents exported: %s/%s" % (i, number_of_docs))
-                logger.info("Documents exported: %s/%s" % (i, number_of_docs))
+            for i, doc in enumerate(_iterate_documents(doc_ids)):
+                doc_dict = {"doc_id": doc.id}
+                doc_dict.update(doc.items)
 
-            row = safe_dict(doc_dict)
-            writer.writerow(row)
+                if i % 20000 == 0:
+                    print("Documents exported: %s/%s" % (i, number_of_docs))
+                    logger.info("Documents exported: %s/%s" % (i, number_of_docs))
 
-        transaction.abort()
-        logger.info("All documents written. Returning CSV")
+                row = safe_dict(doc_dict)
+                writer.writerow(row)
 
-        # writer.writerows(doc_dicts)
-        return csvfile.getvalue().decode("utf-8")
+            transaction.abort()
+            logger.info("All documents written. Closing CSV.")
+
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
     def exportDocumentAsXML(self, xmldoc, doc):
