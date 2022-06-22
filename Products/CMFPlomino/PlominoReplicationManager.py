@@ -9,6 +9,7 @@
 
 __author__ = """Xavier PERROT  - Eric BREHAULT <eric.brehault@makina-corpus.org>"""
 __docformat__ = 'plaintext'
+from tempfile import TemporaryFile
 
 # Standard
 from xml.dom.minidom import getDOMImplementation
@@ -17,8 +18,6 @@ from xml.parsers.expat import ExpatError
 import base64
 import codecs
 import collections
-from collections import OrderedDict
-from tempfile import TemporaryFile
 import csv
 import decimal
 import glob
@@ -27,7 +26,6 @@ from six import iteritems
 from io import BytesIO
 import transaction
 import xmlrpclib
-
 try:
     collections_abc = collections.abc
 except AttributeError:
@@ -113,14 +111,12 @@ def dump_decimal(self, value, write):
     self.dump_struct(value, write)
 
 def safe_dict(data):
-    def newline_safe(string_value):
-        return string_value.replace('\n', '\\n').replace('\r', '\\r')
     if isinstance(data, str):
-        return newline_safe(data)
+        return data
     elif isinstance(data, unicode):
-        return newline_safe(data).encode("utf-8")
+        return data.encode("utf-8")
     elif isinstance(data, collections_abc.Mapping):
-        return OrderedDict([(k, safe_dict(v)) for k, v in iteritems(data)])
+        return {k: safe_dict(v) for k, v in iteritems(data)}
     elif isinstance(data, list):
         return [safe_dict(value) for value in data]
         # return type(data)(map(safe_dict, data))
@@ -1333,13 +1329,18 @@ class PlominoReplicationManager(Persistent):
         fileobj.write(content)
         fileobj.close()
 
-    
-
-
-    security.declareProtected(READ_PERMISSION, "exportDocumentsAsCSV")
+    security.declareProtected(READ_PERMISSION, 'exportDocumentsAsCSV')
     def exportDocumentsAsCSV(self, docids=None):
         logger.info("Starting documents CSV export...")
         forms = self.getForms()
+        max_columns = 1000  # Arbitrary limit of 100000 columns. We'll remove excess columns later.
+        fieldnames = range(max_columns)
+        column_number_field_name_mapping = {0: "doc_id"}
+
+        for form in forms:
+            for field in form.getFormFields():
+                if field.id not in column_number_field_name_mapping.itervalues():
+                    column_number_field_name_mapping[len(column_number_field_name_mapping)] = field.id
 
         if docids:
             doc_ids = [self.getDocument(i) for i in docids]
@@ -1349,92 +1350,92 @@ class PlominoReplicationManager(Persistent):
         number_of_docs = len(doc_ids)
         logger.info("Exporting %s documents..." % number_of_docs)
 
-        # Arbitrary limit of 100000 columns. We'll remove excess columns later.
-        max_columns = 100000
-        column_number_field_name_mapping = {0: "doc_id"}
-        current_mapping_index = 0
-
-        for form in forms:
-            for field in form.getFormFields():
-                if field.id not in column_number_field_name_mapping.itervalues():
-                    print(
-                        "Adding new field: %s with column number %s"
-                        % (field.id, current_mapping_index)
-                    )
-                    column_number_field_name_mapping[current_mapping_index] = field.id
-                    current_mapping_index += 1
+        # Returns a tuple of ({doc_data}, [new_field_names]) 
+        def _iterate_documents(doc_ids_list):
+            for i, doc_id in enumerate(doc_ids_list):
+                if i % 2000 == 0:
+                    transaction.abort()
+                yield self.documents[doc_id]
 
         transaction.abort()
+        logger.info("All fieldnames checked. Starting document writing")
+
+        zope_export_folder_path = getattr(getConfiguration(), 'clienthome', "")
+        export_folder_path = os.path.join(zope_export_folder_path, 'export', self.id)
+        export_path = os.path.join(export_folder_path, '%s.csv' % self.id)
+        if os.path.isdir(export_folder_path):
+            # remove previous export
+            if os.path.exists(export_path):
+                os.remove(export_path)
+        else:
+            os.makedirs(export_folder_path)
 
         with TemporaryFile(mode="w+b") as csv_data_tempfile:
-            temp_writer = csv.DictWriter(
-                csv_data_tempfile, fieldnames=range(max_columns), dialect=csv.excel
-            )
+            writer = csv.DictWriter(csv_data_tempfile, fieldnames=fieldnames)
 
-            for i, doc_id in enumerate(doc_ids):
-                doc = self.getDocument(doc_id)
+            transaction.abort() 
 
-                # Update fieldnames
-                for field_name in doc.getItems():
-                    if field_name not in column_number_field_name_mapping.itervalues():
-                        print(
-                            "Adding new field: %s with column number %s"
-                            % (field_name, current_mapping_index)
-                        )
-                        # column_fields.append(field_name)
-                        column_number_field_name_mapping[current_mapping_index] = field_name
-                        current_mapping_index += 1
-
+            for i, doc in enumerate(_iterate_documents(doc_ids)):
                 document_values = {0: doc.id}
                 for column_number in column_number_field_name_mapping:
                     field_name = column_number_field_name_mapping[column_number]
                     document_values[column_number] = doc.getItem(field_name, "") or ""
 
-                empty_columns_to_add = max_columns - len(document_values) - 1
-                for column_number in range(
-                    empty_columns_to_add, len(document_values) + empty_columns_to_add
-                ):
-                    document_values[column_number] = ""
-
-                temp_writer.writerow(safe_dict(document_values))
-
-                # Cleanup unused objects to free memory
-                if i % 2000 == 0:
-                    transaction.abort()
+                for field_name in doc.getItems():
+                    if field_name not in column_number_field_name_mapping.itervalues():
+                        print("Adding field %s" % field_name)
+                        column_number_field_name_mapping[len(column_number_field_name_mapping)] = field_name
 
                 if i % 20000 == 0:
                     print("Documents exported: %s/%s" % (i, number_of_docs))
                     logger.info("Documents exported: %s/%s" % (i, number_of_docs))
 
+                row = safe_dict(document_values)
+                writer.writerow(row)
+
             transaction.abort()
-            logger.info("All documents written. Creating CSV file...")
+            logger.info("All documents written. Closing CSV.")
 
-            # Get the zope 'export' folder, normally in `var/instance/export`.
-            zope_export_folder_path = getattr(getConfiguration(), "clienthome", "")
-            export_folder_path = os.path.join(zope_export_folder_path, "export", self.id)
-            export_path = os.path.join(export_folder_path, "%s.csv" % self.id)
-            # remove previous existing export
-            if os.path.isdir(export_folder_path):
-                if os.path.exists(export_path):
-                    os.remove(export_path)
-            else:
-                os.makedirs(export_folder_path)
+        with codecs.open(export_path, "w", "utf-8") as csvfile:
+            for line in csv_data_tempfile:
+                csvfile.write(line.decode("utf-8"))
 
-            with codecs.open(export_path, "wb", "utf-8") as csvfile:
-                writer = csv.writer(csvfile)
 
-                number_of_used_columns = len(column_number_field_name_mapping)
-                csv_header = []
-                for column_number in range(number_of_used_columns):
-                    header = column_number_field_name_mapping[column_number]
-                    csv_header.append(header)
+    security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
+    def exportDocumentAsXML(self, xmldoc, doc):
+        """
+        """
+        node = xmldoc.createElement('document')
+        node.setAttribute('id', doc.id)
+        node.setAttribute('lastmodified', doc.getLastModified(asString=True))
 
-                writer.writerow(csv_header)
-                csv_data_tempfile.seek(0)
-                columns_to_remove = max_columns - len(column_number_field_name_mapping)
-                for i, line in enumerate(csv_data_tempfile):
-                    csvfile.write(line[:-columns_to_remove].decode("utf-8") + "\n")
+        # export items
+        items = doc.items
+        if type(items) is not dict:
+            items = doc.items.data
+        str_items = xmlrpclib.dumps((items,), allow_none=True)
+        try:
+            dom_items = parseString(str_items)
+        except ExpatError:
+            dom_items = parseString(escape_xml_illegal_chars(str_items))
+        node.appendChild(dom_items.documentElement)
 
+        # export attached files
+        for f in doc.getFilenames():
+            attached_file = doc.getfile(f)
+            if not attached_file:
+                continue
+            fnode = xmldoc.createElement('attachment')
+            fnode.setAttribute('id', f)
+            fnode.setAttribute(
+                    'contenttype',
+                    getattr(attached_file, 'content_type',''))
+            data = xmldoc.createCDATASection(
+                    str(attached_file).encode('base64'))
+            fnode.appendChild(data)
+            node.appendChild(fnode)
+
+        return node
 
     security.declareProtected(REMOVE_PERMISSION, 'manage_importFromXML')
     @postonly
