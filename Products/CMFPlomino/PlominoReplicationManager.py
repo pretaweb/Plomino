@@ -1376,15 +1376,15 @@ class PlominoReplicationManager(Persistent):
             transaction.abort() 
 
             for i, doc in enumerate(_iterate_documents(doc_ids)):
-                document_values = {0: doc.id}
-                for column_number in column_number_field_name_mapping:
-                    field_name = column_number_field_name_mapping[column_number]
-                    document_values[column_number] = doc.getItem(field_name, "") or ""
-
                 for field_name in doc.getItems():
                     if field_name not in column_number_field_name_mapping.itervalues():
                         print("Adding field %s" % field_name)
                         column_number_field_name_mapping[len(column_number_field_name_mapping)] = field_name
+
+                document_values = {0: doc.id}
+                for column_number in column_number_field_name_mapping:
+                    field_name = column_number_field_name_mapping[column_number]
+                    document_values[column_number] = doc.getItem(field_name, "") or ""
 
                 if i % 20000 == 0:
                     print("Documents exported: %s/%s" % (i, number_of_docs))
