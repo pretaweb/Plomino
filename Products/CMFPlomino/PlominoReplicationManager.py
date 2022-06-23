@@ -1349,10 +1349,8 @@ class PlominoReplicationManager(Persistent):
                 if field.id not in column_number_field_name_mapping.itervalues():
                     column_number_field_name_mapping[len(column_number_field_name_mapping)] = field.id
 
-        if docids:
-            doc_ids = [self.getDocument(i) for i in docids]
-        else:
-            doc_ids = self.documents.keys()
+        # Use all of the documents if we don't specify a set of documents to use
+        doc_ids = docids if docids else self.documents.keys()
 
         number_of_docs = len(doc_ids)
         logger.info("Exporting %s documents..." % number_of_docs)
