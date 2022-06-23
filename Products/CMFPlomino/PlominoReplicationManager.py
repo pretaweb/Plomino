@@ -1394,9 +1394,9 @@ class PlominoReplicationManager(Persistent):
                     field_name = column_number_field_name_mapping[column_number]
                     document_values[column_number] = doc.getItem(field_name, "") or ""
 
-                empty_columns_to_add = max_columns - len(document_values) - 1
-                for column_number in range(empty_columns_to_add, len(document_values) + empty_columns_to_add):
-                    document_values[column_number] = ""
+                # empty_columns_to_add = max_columns - len(document_values) - 1
+                # for column_number in range(empty_columns_to_add, len(document_values) + empty_columns_to_add):
+                    # document_values[column_number] = ""
 
                 if i % 20000 == 0:
                     print("Documents exported: %s/%s" % (i, number_of_docs))
