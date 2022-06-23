@@ -1336,11 +1336,14 @@ class PlominoReplicationManager(Persistent):
     security.declareProtected(READ_PERMISSION, 'exportDocumentsAsCSV')
     def exportDocumentsAsCSV(self, docids=None):
         logger.info("Starting documents CSV export...")
+
         forms = self.getForms()
         max_columns = 1000  # Arbitrary limit of 100000 columns. We'll remove excess columns later.
         fieldnames = range(max_columns)
         column_number_field_name_mapping = {0: "doc_id"}
 
+        # This should map most fields, but there's some data that isndoesn't
+        #   have a definition which we'll fetch later.
         for form in forms:
             for field in form.getFormFields():
                 if field.id not in column_number_field_name_mapping.itervalues():
@@ -1354,13 +1357,16 @@ class PlominoReplicationManager(Persistent):
         number_of_docs = len(doc_ids)
         logger.info("Exporting %s documents..." % number_of_docs)
 
-        # Returns a tuple of ({doc_data}, [new_field_names]) 
+        # Aborts the transaction to keep memory usage down. Zope keeps a
+        #   reference around to the iterated object which causes garbage
+        #   collection to not clean everything up.
         def _iterate_documents(doc_ids_list):
             for i, doc_id in enumerate(doc_ids_list):
                 if i % 2000 == 0:
                     transaction.abort()
                 yield self.documents[doc_id]
 
+        # Free leftover objects from getting document list
         transaction.abort()
         logger.info("All fieldnames checked. Starting document writing")
 
@@ -1374,10 +1380,10 @@ class PlominoReplicationManager(Persistent):
         else:
             os.makedirs(export_folder_path)
 
+        # Using a temporary file to store the data, we'll write to the real file
+        #   later once we've got all the possible header combinations
         with TemporaryFile(mode="w+b") as csv_data_tempfile:
             writer = csv.DictWriter(csv_data_tempfile, fieldnames=fieldnames)
-
-            transaction.abort() 
 
             for i, doc in enumerate(_iterate_documents(doc_ids)):
                 for field_name in doc.getItems():
@@ -1401,6 +1407,7 @@ class PlominoReplicationManager(Persistent):
                 row = safe_dict(document_values)
                 writer.writerow(row)
 
+            # Cleanup leftover objects
             transaction.abort()
             logger.info("All documents written. Closing CSV.")
 
