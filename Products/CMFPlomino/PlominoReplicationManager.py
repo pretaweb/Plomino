@@ -110,11 +110,15 @@ def dump_decimal(self, value, write):
         }
     self.dump_struct(value, write)
 
+def _newline_safe_string(s):
+    return s.replace('\n', '\\n').replace('\r', '\\r')
+
+
 def safe_dict(data):
     if isinstance(data, str):
-        return data
+        return _newline_safe_string(data)
     elif isinstance(data, unicode):
-        return data.encode("utf-8")
+        return _newline_safe_string(data).encode("utf-8")
     elif isinstance(data, collections_abc.Mapping):
         return {k: safe_dict(v) for k, v in iteritems(data)}
     elif isinstance(data, list):
