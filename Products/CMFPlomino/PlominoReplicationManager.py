@@ -1333,12 +1333,15 @@ class PlominoReplicationManager(Persistent):
         fileobj.write(content)
         fileobj.close()
 
+
     security.declareProtected(READ_PERMISSION, 'exportDocumentsAsCSV')
     def exportDocumentsAsCSV(self, docids=None):
         logger.info("Starting documents CSV export...")
 
         forms = self.getForms()
-        max_columns = 1000  # Arbitrary limit of 100000 columns. We'll remove excess columns later.
+        max_columns = (
+            1000  # Arbitrary limit of 100000 columns. We'll remove excess columns later.
+        )
         fieldnames = range(max_columns)
         column_number_field_name_mapping = {}
 
@@ -1347,7 +1350,9 @@ class PlominoReplicationManager(Persistent):
         for form in forms:
             for field in form.getFormFields():
                 if field.id not in column_number_field_name_mapping.itervalues():
-                    column_number_field_name_mapping[len(column_number_field_name_mapping) + 1] = field.id
+                    column_number_field_name_mapping[
+                        len(column_number_field_name_mapping) + 1
+                    ] = field.id
 
         # Use all of the documents if we don't specify a set of documents to use
         doc_ids = docids if docids else self.documents.keys()
@@ -1371,9 +1376,9 @@ class PlominoReplicationManager(Persistent):
         transaction.abort()
         logger.info("All fieldnames checked. Starting document writing")
 
-        zope_export_folder_path = getattr(getConfiguration(), 'clienthome', "")
-        export_folder_path = os.path.join(zope_export_folder_path, 'export', self.id)
-        export_path = os.path.join(export_folder_path, '%s.csv' % self.id)
+        zope_export_folder_path = getattr(getConfiguration(), "clienthome", "")
+        export_folder_path = os.path.join(zope_export_folder_path, "export", self.id)
+        export_path = os.path.join(export_folder_path, "%s.csv" % self.id)
         if os.path.isdir(export_folder_path):
             # remove previous export
             if os.path.exists(export_path):
@@ -1386,11 +1391,13 @@ class PlominoReplicationManager(Persistent):
         with TemporaryFile(mode="w+b") as csv_data_tempfile:
             writer = csv.DictWriter(csv_data_tempfile, fieldnames=fieldnames)
 
-            for i, doc in enumerate(_iterate_documents(doc_ids)):
+            for doc in _iterate_documents(doc_ids):
                 for field_name in doc.getItems():
                     if field_name not in column_number_field_name_mapping.itervalues():
                         print("Adding field %s" % field_name)
-                        column_number_field_name_mapping[len(column_number_field_name_mapping)] = field_name
+                        column_number_field_name_mapping[
+                            len(column_number_field_name_mapping)
+                        ] = field_name
 
                 document_values = {0: doc.id}
                 for column_number in column_number_field_name_mapping:
@@ -1418,7 +1425,9 @@ class PlominoReplicationManager(Persistent):
 
                 csv_data_tempfile.seek(0)
                 # + 2 is to account for the `/r/n` at the end of each line
-                characters_to_remove = max_columns - len(column_number_field_name_mapping) + 2
+                characters_to_remove = (
+                    max_columns - len(column_number_field_name_mapping) + 2
+                )
                 for line in csv_data_tempfile:
                     csvfile.write(line[:-characters_to_remove].decode("utf-8") + "\r\n")
 
