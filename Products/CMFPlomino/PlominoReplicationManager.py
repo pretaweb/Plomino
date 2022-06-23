@@ -1396,7 +1396,7 @@ class PlominoReplicationManager(Persistent):
                     if field_name not in column_number_field_name_mapping.itervalues():
                         print("Adding field %s" % field_name)
                         column_number_field_name_mapping[
-                            len(column_number_field_name_mapping)
+                            len(column_number_field_name_mapping) + 1
                         ] = field_name
 
                 document_values = {0: doc.id}
