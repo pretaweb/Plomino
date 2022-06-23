@@ -1415,12 +1415,12 @@ class PlominoReplicationManager(Persistent):
                     csv_header.append(header)
                 writer = csv.DictWriter(csvfile, fieldnames=csv_header)
                 writer.writeheader()
-            
-                csv_data_tempfile.seek(0)
-                columns_to_remove = max_columns - len(column_number_field_name_mapping)
-                for line in csv_data_tempfile:
-                    csvfile.write(line[:-columns_to_remove].decode("utf-8") + "\n")
 
+                csv_data_tempfile.seek(0)
+                # + 2 is to account for the `/r/n` at the end of each line
+                characters_to_remove = max_columns - len(column_number_field_name_mapping) + 2
+                for line in csv_data_tempfile:
+                    csvfile.write(line[:-characters_to_remove].decode("utf-8") + "\r\n")
 
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
