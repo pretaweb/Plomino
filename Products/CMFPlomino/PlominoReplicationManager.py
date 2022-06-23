@@ -1340,14 +1340,14 @@ class PlominoReplicationManager(Persistent):
         forms = self.getForms()
         max_columns = 1000  # Arbitrary limit of 100000 columns. We'll remove excess columns later.
         fieldnames = range(max_columns)
-        column_number_field_name_mapping = {0: "doc_id"}
+        column_number_field_name_mapping = {}
 
         # This should map most fields, but there's some data that isndoesn't
         #   have a definition which we'll fetch later.
         for form in forms:
             for field in form.getFormFields():
                 if field.id not in column_number_field_name_mapping.itervalues():
-                    column_number_field_name_mapping[len(column_number_field_name_mapping)] = field.id
+                    column_number_field_name_mapping[len(column_number_field_name_mapping) + 1] = field.id
 
         # Use all of the documents if we don't specify a set of documents to use
         doc_ids = docids if docids else self.documents.keys()
@@ -1394,10 +1394,6 @@ class PlominoReplicationManager(Persistent):
                     field_name = column_number_field_name_mapping[column_number]
                     document_values[column_number] = doc.getItem(field_name, "") or ""
 
-                # empty_columns_to_add = max_columns - len(document_values) - 1
-                # for column_number in range(empty_columns_to_add, len(document_values) + empty_columns_to_add):
-                    # document_values[column_number] = ""
-
                 if i % 20000 == 0:
                     print("Documents exported: %s/%s" % (i, number_of_docs))
                     logger.info("Documents exported: %s/%s" % (i, number_of_docs))
@@ -1409,9 +1405,24 @@ class PlominoReplicationManager(Persistent):
             transaction.abort()
             logger.info("All documents written. Closing CSV.")
 
-        with codecs.open(export_path, "w", "utf-8") as csvfile:
-            for line in csv_data_tempfile:
-                csvfile.write(line.decode("utf-8"))
+            # Ensure that the document_id column has a readable name
+            column_number_field_name_mapping[0] = "doc_id"
+
+            with codecs.open(export_path, "w", "utf-8") as csvfile:
+                number_of_used_columns = len(column_number_field_name_mapping)
+                csv_header = []
+                for column_number in range(number_of_used_columns):
+                    header = column_number_field_name_mapping[column_number]
+                    csv_header.append(header)
+                writer = csv.DictWriter(csvfile, fieldnames=csv_header)
+                writer.writeheader()
+            
+                # import pdb; pdb.set_trace()
+                csv_data_tempfile.seek(0)
+                columns_to_remove = max_columns - len(column_number_field_name_mapping)
+                for line in csv_data_tempfile:
+                    csvfile.write(line[:-columns_to_remove].decode("utf-8") + "\n")
+
 
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
