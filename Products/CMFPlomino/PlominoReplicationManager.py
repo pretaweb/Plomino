@@ -1362,6 +1362,9 @@ class PlominoReplicationManager(Persistent):
             for i, doc_id in enumerate(doc_ids_list):
                 if i % 2000 == 0:
                     transaction.abort()
+                if i % 20000 == 0:
+                    print("Documents exported: %s/%s" % (i, number_of_docs))
+                    logger.info("Documents exported: %s/%s" % (i, number_of_docs))
                 yield self.documents[doc_id]
 
         # Free leftover objects from getting document list
@@ -1394,10 +1397,6 @@ class PlominoReplicationManager(Persistent):
                     field_name = column_number_field_name_mapping[column_number]
                     document_values[column_number] = doc.getItem(field_name, "") or ""
 
-                if i % 20000 == 0:
-                    print("Documents exported: %s/%s" % (i, number_of_docs))
-                    logger.info("Documents exported: %s/%s" % (i, number_of_docs))
-
                 row = safe_dict(document_values)
                 writer.writerow(row)
 
@@ -1417,7 +1416,6 @@ class PlominoReplicationManager(Persistent):
                 writer = csv.DictWriter(csvfile, fieldnames=csv_header)
                 writer.writeheader()
             
-                # import pdb; pdb.set_trace()
                 csv_data_tempfile.seek(0)
                 columns_to_remove = max_columns - len(column_number_field_name_mapping)
                 for line in csv_data_tempfile:
