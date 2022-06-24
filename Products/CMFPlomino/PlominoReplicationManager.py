@@ -9,6 +9,7 @@
 
 __author__ = """Xavier PERROT  - Eric BREHAULT <eric.brehault@makina-corpus.org>"""
 __docformat__ = 'plaintext'
+from contextlib import closing
 from tempfile import TemporaryFile
 
 # Standard
@@ -126,6 +127,79 @@ def safe_dict(data):
         # return type(data)(map(safe_dict, data))
     else:
         return data
+
+class ReadOverWriteFile(object):
+    """
+    Opens a file for reading and can be written as it's being read.
+
+    Create a dummy file
+
+    >>> import tempfile
+    >>> temp_name = next(tempfile._get_candidate_names())
+    >>> with open(temp_name, "w") as fp:
+    ...     fp.writelines(["foobar\\n"] * 3)
+
+    Reopen it and rewrite it as we go
+
+    >>> fp = ReadOverWriteFile(temp_name)
+    >>> while True:
+    ...    line = fp.readline()
+    ...    if line == '':
+    ...        break
+    ...    fp.write(line.replace("foo",""))
+    >>> fp.close()
+
+    Check the file is shortened
+    >>> print(open(temp_name).read())
+    bar
+    bar
+    bar
+    <BLANKLINE>
+
+    But if we make the lines longer we get problems
+    >>> fp = ReadWriteFile(temp_name)
+    >>> while True:
+    ...    line = fp.readline()
+    ...    if line == '':
+    ...        break
+    ...    fp.write(line.replace("bar","foobar"))
+    Traceback (most recent call last):
+     ...
+    OSError: Can't write more than you read
+    """
+
+    def __init__(self, path, **params):
+        self.buf = open(path, "r+", **params)
+        self.write_fp = 0
+
+    def read(self, size = None):
+        return self.buf.read(size)
+
+    def readline(self, size = -1):
+        return self.buf.readline(size)
+
+    def write(self, data):
+        read_fp = self.buf.tell()
+        self.buf.seek(self.write_fp)
+        self.write_fp += self.buf.write(data)
+        if self.write_fp > read_fp:
+            raise IOError("Can't write more than you read")
+        self.buf.seek(read_fp)
+
+    def writelines(self, lines):
+        for data in lines:
+            self.write(data)
+
+    def flush(self):
+        self.buf.flush()
+
+    def tell(self):
+        return self.write_fp
+
+    def close(self):
+        self.buf.truncate(self.write_fp)
+        self.buf.close()
+
 
 xmlrpclib.Marshaller.dispatch[plomino_decimal] = dump_decimal
 xmlrpclib.Marshaller.dispatch[decimal.Decimal] = dump_decimal
@@ -1342,17 +1416,13 @@ class PlominoReplicationManager(Persistent):
         max_columns = (
             1000  # Arbitrary limit of 100000 columns. We'll remove excess columns later.
         )
-        fieldnames = range(max_columns)
-        column_number_field_name_mapping = {}
+        headermap = {}
 
         # This should map most fields, but there's some data that isndoesn't
         #   have a definition which we'll fetch later.
         for form in forms:
             for field in form.getFormFields():
-                if field.id not in column_number_field_name_mapping.itervalues():
-                    column_number_field_name_mapping[
-                        len(column_number_field_name_mapping) + 1
-                    ] = field.id
+                headermap.setdefault(field.id, len(headermap) + 1)
 
         # Use all of the documents if we don't specify a set of documents to use
         doc_ids = docids if docids else self.documents.keys()
@@ -1386,50 +1456,47 @@ class PlominoReplicationManager(Persistent):
         else:
             os.makedirs(export_folder_path)
 
-        # Using a temporary file to store the data, we'll write to the real file
-        #   later once we've got all the possible header combinations
-        with TemporaryFile(mode="w+b") as csv_data_tempfile:
-            writer = csv.DictWriter(csv_data_tempfile, fieldnames=fieldnames)
+        with codecs.open(export_path, "w", "utf-8") as csvfile:
+            def longname(col):
+                return "dummy_long_col_name_{}".format(col)  # Try ensure our header is longer than real one will be
+            dummycols = [longname(col) for col in range(max_columns)]
+            writer = csv.DictWriter(csvfile, fieldnames=dummycols)
+            writer.writeheader()  # Important we have a header so we have enough space to overwrite it
 
             for doc in _iterate_documents(doc_ids):
                 for field_name in doc.getItems():
-                    if field_name not in column_number_field_name_mapping.itervalues():
+                    if field_name not in headermap:
                         print("Adding field %s" % field_name)
-                        column_number_field_name_mapping[
-                            len(column_number_field_name_mapping) + 1
-                        ] = field_name
+                        headermap[field_name] = len(headermap) + 1
+                        assert len(headermap) < max_columns
 
-                document_values = {0: doc.id}
-                for column_number in column_number_field_name_mapping:
-                    field_name = column_number_field_name_mapping[column_number]
-                    document_values[column_number] = doc.getItem(field_name, "") or ""
+                document_values = {longname(0): doc.id}
+                for field_name, column_number in headermap.items():
+                    document_values[longname(column_number)] = doc.getItem(field_name, "") or ""
 
                 row = safe_dict(document_values)
                 writer.writerow(row)
 
-            # Cleanup leftover objects
-            transaction.abort()
-            logger.info("All documents written. Closing CSV.")
+        # Cleanup leftover objects
+        transaction.abort()
+        logger.info("All documents written. Closing CSV.")
 
-            # Ensure that the document_id column has a readable name
-            column_number_field_name_mapping[0] = "doc_id"
+        # Ensure that the document_id column has a readable name
+        headermap["doc_id"] = 0
 
-            with codecs.open(export_path, "w", "utf-8") as csvfile:
-                number_of_used_columns = len(column_number_field_name_mapping)
-                csv_header = []
-                for column_number in range(number_of_used_columns):
-                    header = column_number_field_name_mapping[column_number]
-                    csv_header.append(header)
-                writer = csv.DictWriter(csvfile, fieldnames=csv_header)
-                writer.writeheader()
+        # Fix up the header with proper fieldnames and remove all the empty columns at the end of each line
+        # Use special file object that lets us write over the same file we are reading from so we don't need two files
+        with closing(ReadOverWriteFile(export_path, encoding="utf-8")) as csvfile:
+            oldheader = csvfile.readline()  # Important the old header is longer than our new one since writing into the same file
 
-                csv_data_tempfile.seek(0)
-                # + 2 is to account for the `/r/n` at the end of each line
-                characters_to_remove = (
-                    max_columns - len(column_number_field_name_mapping) + 2
-                )
-                for line in csv_data_tempfile:
-                    csvfile.write(line[:-characters_to_remove].decode("utf-8") + "\r\n")
+            csv_header = [field_name for field_name, _ in sorted(headermap.items(), key=lambda x: x[1])]
+            writer = csv.DictWriter(csvfile, fieldnames=csv_header)
+            writer.writeheader()
+
+            # + 2 is to account for the `/r/n` at the end of each line
+            characters_to_remove = max_columns - len(headermap) + 2
+            for line in csvfile.readline():
+                csvfile.write(line[:-characters_to_remove].decode("utf-8") + "\r\n")
 
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
