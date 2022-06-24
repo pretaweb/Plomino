@@ -196,9 +196,11 @@ class ReadOverWriteFile(object):
     def write(self, data):
         read_fp = self.buf.tell()
         self.buf.seek(self.write_fp)
-        self.buf.write(data)
-        written = self.buf.tell() - self.write_fp 
-        self.write_fp = self.buf.tell()
+        written = self.buf.write(data)
+        # write doesn't return anything in Python2
+        if not written:
+            written = self.buf.tell()
+        self.write_fp += written
         if self.write_fp > read_fp:
             raise IOError("Can't write more than you read")
         self.buf.seek(read_fp)
@@ -1474,14 +1476,14 @@ class PlominoReplicationManager(Persistent):
         else:
             os.makedirs(export_folder_path)
 
-        with codecs.open(export_path, "w", "utf-8") as csvfile:
+        with codecs.open(export_path, "wb") as csvfile:
             def longname(col):
                 return "dummy_long_col_name_{}".format(col)  # Try ensure our header is longer than real one will be
             dummycols = [longname(col) for col in range(max_columns)]
             writer = csv.DictWriter(csvfile, fieldnames=dummycols)
             writer.writeheader()  # Important we have a header so we have enough space to overwrite it
 
-            for doc in _iterate_documents(doc_ids):
+            for doc in _iterate_documents(doc_ids[:20001]):
                 for field_name in doc.getItems():
                     if field_name not in headermap:
                         print("Adding field %s" % field_name)
