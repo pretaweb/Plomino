@@ -186,15 +186,12 @@ class ReadOverWriteFile(object):
     def __init__(self, path, **params):
         self.buf = codecs.open(path, "r+", **params)
         self.write_fp = 0
-        self._lock = threading.RLock()
 
     def read(self, size = None):
-        with self._lock:
-            return self.buf.read(size)
+        return self.buf.read(size)
 
     def readline(self, size = -1):
-        with self._lock:
-            return self.buf.readline(size)
+        return self.buf.readline(size)
     
     def __iter__(self):
         while True:
@@ -204,13 +201,12 @@ class ReadOverWriteFile(object):
             yield line
 
     def write(self, data):
-        with self._lock:
-            read_fp = self.buf.tell()
-            self.buf.seek(self.write_fp)
-            self.write_fp += self.buf.write(data)
-            if self.write_fp > read_fp:
-                raise IOError("Can't write more than you read")
-            self.buf.seek(read_fp)
+        read_fp = self.buf.tell()
+        self.buf.seek(self.write_fp)
+        self.write_fp += self.buf.write(data)
+        if self.write_fp > read_fp:
+            raise IOError("Can't write more than you read")
+        self.buf.seek(read_fp)
 
     def writelines(self, lines):
         for data in lines:
