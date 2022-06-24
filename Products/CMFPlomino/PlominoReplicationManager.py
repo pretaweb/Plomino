@@ -135,6 +135,7 @@ class ReadOverWriteFile(object):
     Create a dummy file
 
     >>> import tempfile
+    >>> from contextlib import closing
     >>> temp_name = next(tempfile._get_candidate_names())
     >>> with open(temp_name, "w") as fp:
     ...     fp.writelines(["foobar\\n"] * 3)
@@ -156,35 +157,60 @@ class ReadOverWriteFile(object):
     bar
     <BLANKLINE>
 
+    More complicated test with csv.writer
+    >>> import csv
+    >>> with closing(ReadOverWriteFile(temp_name)) as fp:
+    ...    reader = csv.DictReader(fp)
+    ...    writer = csv.DictWriter(fp, fieldnames=["foobar"])
+    ...    for line in reader:
+    ...       writer.writerow(dict(foobar="123"))
+    >>> print(open(temp_name).read())
+    123
+    123
+    <BLANKLINE>
+
     But if we make the lines longer we get problems
-    >>> fp = ReadWriteFile(temp_name)
+    >>> fp = ReadOverWriteFile(temp_name)
     >>> while True:
     ...    line = fp.readline()
     ...    if line == '':
     ...        break
-    ...    fp.write(line.replace("bar","foobar"))
+    ...    fp.write(line.replace("123","foobar"))
     Traceback (most recent call last):
      ...
     OSError: Can't write more than you read
+
+
     """
 
     def __init__(self, path, **params):
-        self.buf = open(path, "r+", **params)
+        self.buf = codecs.open(path, "r+", **params)
         self.write_fp = 0
+        self._lock = threading.RLock()
 
     def read(self, size = None):
-        return self.buf.read(size)
+        with self._lock:
+            return self.buf.read(size)
 
     def readline(self, size = -1):
-        return self.buf.readline(size)
+        with self._lock:
+            return self.buf.readline(size)
+    
+    def __iter__(self):
+        while True:
+            line = self.readline()
+            if line == '':
+                break
+            yield line
 
     def write(self, data):
-        read_fp = self.buf.tell()
-        self.buf.seek(self.write_fp)
-        self.write_fp += self.buf.write(data)
-        if self.write_fp > read_fp:
-            raise IOError("Can't write more than you read")
-        self.buf.seek(read_fp)
+        with self._lock:
+            read_fp = self.buf.tell()
+            self.buf.seek(self.write_fp)
+            self.write_fp += self.buf.write(data)
+            if self.write_fp > read_fp:
+                raise IOError("Can't write more than you read")
+            self.buf.seek(read_fp)
 
     def writelines(self, lines):
         for data in lines:
