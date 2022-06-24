@@ -158,23 +158,22 @@ class ReadOverWriteFile(object):
     ...    reader = csv.DictReader(fp)
     ...    writer = csv.DictWriter(fp, fieldnames=reader.fieldnames)
     ...    for num, line in enumerate(reader):
-    ...       if num == 0: writer.writeheader()
-    ...       writer.writerow(dict(name2="f"))
+    ...       if num == 0: _ = writer.writeheader()
+    ...       _ = writer.writerow(dict(name2="f"))
     >>> print(open(temp_name).read())
     name1,name2
+    ,f
     ,f
     ,f
     <BLANKLINE>
 
     But if we make the lines longer we get problems
     >>> with closing(ReadOverWriteFile(temp_name)) as fp:
-    ...    for line in fp.readline():
-    ...        fp.write(line.replace("f", "foobar"))
+    ...    for line in fp:
+    ...        _ = fp.write(line.replace("f", "foobarfoobar"))
     Traceback (most recent call last):
      ...
     OSError: Can't write more than you read
-
-
     """
 
     def __init__(self, path, **params):
@@ -197,8 +196,9 @@ class ReadOverWriteFile(object):
     def write(self, data):
         read_fp = self.buf.tell()
         self.buf.seek(self.write_fp)
-        written =  self.buf.write(data)
-        self.write_fp += written
+        self.buf.write(data)
+        written = self.buf.tell() - self.write_fp 
+        self.write_fp = self.buf.tell()
         if self.write_fp > read_fp:
             raise IOError("Can't write more than you read")
         self.buf.seek(read_fp)
