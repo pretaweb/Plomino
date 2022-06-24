@@ -197,7 +197,10 @@ class ReadOverWriteFile(object):
     def write(self, data):
         read_fp = self.buf.tell()
         self.buf.seek(self.write_fp)
-        written =  self.buf.write(data)
+        written = self.buf.write(data)
+        # write doesn't return anything in Python2
+        if not written:
+            written = self.buf.tell()
         self.write_fp += written
         if self.write_fp > read_fp:
             raise IOError("Can't write more than you read")
