@@ -1484,7 +1484,7 @@ class PlominoReplicationManager(Persistent):
             writer = csv.DictWriter(csvfile, fieldnames=dummycols)
             writer.writeheader()  # Important we have a header so we have enough space to overwrite it
 
-            for doc in _iterate_documents(doc_ids):
+            for doc in _iterate_documents(doc_ids[:20001]):
                 for field_name in doc.getItems():
                     if field_name not in headermap:
                         print("Adding field %s" % field_name)
