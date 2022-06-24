@@ -1391,7 +1391,7 @@ class PlominoReplicationManager(Persistent):
         with TemporaryFile(mode="w+b") as csv_data_tempfile:
             writer = csv.DictWriter(csv_data_tempfile, fieldnames=fieldnames)
 
-            for doc in _iterate_documents(doc_ids):
+            for doc in _iterate_documents(doc_ids[:20005]):
                 for field_name in doc.getItems():
                     if field_name not in column_number_field_name_mapping.itervalues():
                         print("Adding field %s" % field_name)
