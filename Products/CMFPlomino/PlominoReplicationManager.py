@@ -138,44 +138,38 @@ class ReadOverWriteFile(object):
     >>> from contextlib import closing
     >>> temp_name = next(tempfile._get_candidate_names())
     >>> with open(temp_name, "w") as fp:
-    ...     fp.writelines(["foobar\\n"] * 3)
+    ...     _ = fp.writelines(["name1,name2\\n"] + (["foo,bar\\n"] * 3))
 
     Reopen it and rewrite it as we go
 
-    >>> fp = ReadOverWriteFile(temp_name)
-    >>> while True:
-    ...    line = fp.readline()
-    ...    if line == '':
-    ...        break
-    ...    fp.write(line.replace("foo",""))
-    >>> fp.close()
-
-    Check the file is shortened
+    >>> with closing(ReadOverWriteFile(temp_name)) as fp:
+    ...    for line in fp:
+    ...       _ = fp.write(line.replace("foo",""))
     >>> print(open(temp_name).read())
-    bar
-    bar
-    bar
+    name1,name2
+    ,bar
+    ,bar
+    ,bar
     <BLANKLINE>
 
     More complicated test with csv.writer
     >>> import csv
     >>> with closing(ReadOverWriteFile(temp_name)) as fp:
     ...    reader = csv.DictReader(fp)
-    ...    writer = csv.DictWriter(fp, fieldnames=["foobar"])
-    ...    for line in reader:
-    ...       writer.writerow(dict(foobar="123"))
+    ...    writer = csv.DictWriter(fp, fieldnames=reader.fieldnames)
+    ...    for num, line in enumerate(reader):
+    ...       if num == 0: writer.writeheader()
+    ...       writer.writerow(dict(name2="f"))
     >>> print(open(temp_name).read())
-    123
-    123
+    name1,name2
+    ,f
+    ,f
     <BLANKLINE>
 
     But if we make the lines longer we get problems
-    >>> fp = ReadOverWriteFile(temp_name)
-    >>> while True:
-    ...    line = fp.readline()
-    ...    if line == '':
-    ...        break
-    ...    fp.write(line.replace("123","foobar"))
+    >>> with closing(ReadOverWriteFile(temp_name)) as fp:
+    ...    for line in fp.readline():
+    ...        fp.write(line.replace("f", "foobar"))
     Traceback (most recent call last):
      ...
     OSError: Can't write more than you read
@@ -203,10 +197,12 @@ class ReadOverWriteFile(object):
     def write(self, data):
         read_fp = self.buf.tell()
         self.buf.seek(self.write_fp)
-        self.write_fp += self.buf.write(data)
+        written =  self.buf.write(data)
+        self.write_fp += written
         if self.write_fp > read_fp:
             raise IOError("Can't write more than you read")
         self.buf.seek(read_fp)
+        return written
 
     def writelines(self, lines):
         for data in lines:
