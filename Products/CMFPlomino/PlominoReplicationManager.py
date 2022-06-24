@@ -1477,7 +1477,7 @@ class PlominoReplicationManager(Persistent):
         else:
             os.makedirs(export_folder_path)
 
-        with codecs.open(export_path, "w", "utf-8") as csvfile:
+        with codecs.open(export_path, "wb") as csvfile:
             def longname(col):
                 return "dummy_long_col_name_{}".format(col)  # Try ensure our header is longer than real one will be
             dummycols = [longname(col) for col in range(max_columns)]
