@@ -1515,7 +1515,7 @@ class PlominoReplicationManager(Persistent):
 
             # + 2 is to account for the `/r/n` at the end of each line
             characters_to_remove = max_columns - len(headermap) + 2
-            for line in csvfile.readline():
+            for line in csvfile:
                 csvfile.write(line[:-characters_to_remove].decode("utf-8") + "\r\n")
 
 
