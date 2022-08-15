@@ -9,6 +9,8 @@
 
 __author__ = """Xavier PERROT  - Eric BREHAULT <eric.brehault@makina-corpus.org>"""
 __docformat__ = 'plaintext'
+from contextlib import closing
+from tempfile import TemporaryFile
 
 # Standard
 from xml.dom.minidom import getDOMImplementation
@@ -16,17 +18,25 @@ from xml.dom.minidom import parseString
 from xml.parsers.expat import ExpatError
 import base64
 import codecs
+import collections
 import csv
 import decimal
 import glob
 import os
+from six import iteritems
+from io import BytesIO
 import transaction
 import xmlrpclib
+try:
+    collections_abc = collections.abc
+except AttributeError:
+    collections_abc = collections
 
 import logging
 logger = logging.getLogger("Replication")
 
 # Zope
+from App.config import getConfiguration
 from Acquisition import *
 from AccessControl.requestmethod import postonly
 from DateTime import DateTime
@@ -100,6 +110,116 @@ def dump_decimal(self, value, write):
         'decimal': str(value),
         }
     self.dump_struct(value, write)
+
+def _newline_safe_string(s):
+    return s.replace('\n', '\\n').replace('\r', '\\r')
+
+
+def safe_dict(data):
+    if isinstance(data, str):
+        return _newline_safe_string(data)
+    elif isinstance(data, unicode):
+        return _newline_safe_string(data).encode("utf-8")
+    elif isinstance(data, collections_abc.Mapping):
+        return {k: safe_dict(v) for k, v in iteritems(data)}
+    elif isinstance(data, list):
+        return [safe_dict(value) for value in data]
+        # return type(data)(map(safe_dict, data))
+    else:
+        return data
+
+class ReadOverWriteFile(object):
+    """
+    Opens a file for reading and can be written as it's being read.
+
+    Create a dummy file
+
+    >>> import tempfile
+    >>> from contextlib import closing
+    >>> temp_name = next(tempfile._get_candidate_names())
+    >>> with open(temp_name, "w") as fp:
+    ...     _ = fp.writelines(["name1,name2\\n"] + (["foo,bar\\n"] * 3))
+
+    Reopen it and rewrite it as we go
+
+    >>> with closing(ReadOverWriteFile(temp_name)) as fp:
+    ...    for line in fp:
+    ...       _ = fp.write(line.replace("foo",""))
+    >>> print(open(temp_name).read())
+    name1,name2
+    ,bar
+    ,bar
+    ,bar
+    <BLANKLINE>
+
+    More complicated test with csv.writer
+    >>> import csv
+    >>> with closing(ReadOverWriteFile(temp_name)) as fp:
+    ...    reader = csv.DictReader(fp)
+    ...    writer = csv.DictWriter(fp, fieldnames=reader.fieldnames)
+    ...    for num, line in enumerate(reader):
+    ...       if num == 0: _ = writer.writeheader()
+    ...       _ = writer.writerow(dict(name2="f"))
+    >>> print(open(temp_name).read())
+    name1,name2
+    ,f
+    ,f
+    ,f
+    <BLANKLINE>
+
+    But if we make the lines longer we get problems
+    >>> with closing(ReadOverWriteFile(temp_name)) as fp:
+    ...    for line in fp:
+    ...        _ = fp.write(line.replace("f", "foobarfoobar"))
+    Traceback (most recent call last):
+     ...
+    OSError: Can't write more than you read
+    """
+
+    def __init__(self, path, **params):
+        self.buf = codecs.open(path, "r+", **params)
+        self.write_fp = 0
+
+    def read(self, size = None):
+        return self.buf.read(size)
+
+    def readline(self, size = -1):
+        return self.buf.readline(size)
+    
+    def __iter__(self):
+        while True:
+            line = self.readline()
+            if line == '':
+                break
+            yield line
+
+    def write(self, data):
+        read_fp = self.buf.tell()
+        self.buf.seek(self.write_fp)
+        written = self.buf.write(data)
+        # write doesn't return anything in Python2
+        if not written:
+            written = self.buf.tell()
+        self.write_fp += written
+        if self.write_fp > read_fp:
+            raise IOError("Can't write more than you read")
+        self.buf.seek(read_fp)
+        return written
+
+    def writelines(self, lines):
+        for data in lines:
+            self.write(data)
+
+    def flush(self):
+        self.buf.flush()
+
+    def tell(self):
+        return self.write_fp
+
+    def close(self):
+        self.buf.truncate(self.write_fp)
+        self.buf.close()
+
 
 xmlrpclib.Marshaller.dispatch[plomino_decimal] = dump_decimal
 xmlrpclib.Marshaller.dispatch[decimal.Decimal] = dump_decimal
@@ -1272,6 +1392,9 @@ class PlominoReplicationManager(Persistent):
                 REQUEST.RESPONSE.setHeader('content-type', 'text/xml')
             return xmldoc.toxml()
 
+        if targettype == 'csv':
+            self.exportDocumentsAsCSV(docids)
+
         if targettype == 'folder':
             if REQUEST:
                 targetfolder = REQUEST.get('targetfolder')
@@ -1303,6 +1426,98 @@ class PlominoReplicationManager(Persistent):
         fileobj = codecs.open(path, "w", "utf-8")
         fileobj.write(content)
         fileobj.close()
+
+
+    security.declareProtected(READ_PERMISSION, 'exportDocumentsAsCSV')
+    def exportDocumentsAsCSV(self, docids=None):
+        logger.info("Starting documents CSV export...")
+
+        forms = self.getForms()
+        max_columns = (
+            1000  # Arbitrary limit of 100000 columns. We'll remove excess columns later.
+        )
+        headermap = {}
+
+        # This should map most fields, but there's some data that isndoesn't
+        #   have a definition which we'll fetch later.
+        for form in forms:
+            for field in form.getFormFields():
+                headermap.setdefault(field.id, len(headermap) + 1)
+
+        # Use all of the documents if we don't specify a set of documents to use
+        doc_ids = docids if docids else self.documents.keys()
+
+        number_of_docs = len(doc_ids)
+        logger.info("Exporting %s documents..." % number_of_docs)
+
+        # Aborts the transaction to keep memory usage down. Zope keeps a
+        #   reference around to the iterated object which causes garbage
+        #   collection to not clean everything up.
+        def _iterate_documents(doc_ids_list):
+            for i, doc_id in enumerate(doc_ids_list):
+                if i % 2000 == 0:
+                    transaction.abort()
+                if i % 20000 == 0:
+                    print("Documents exported: %s/%s" % (i, number_of_docs))
+                    logger.info("Documents exported: %s/%s" % (i, number_of_docs))
+                yield self.documents[doc_id]
+
+        # Free leftover objects from getting document list
+        transaction.abort()
+        logger.info("All fieldnames checked. Starting document writing")
+
+        zope_export_folder_path = getattr(getConfiguration(), "clienthome", "")
+        export_folder_path = os.path.join(zope_export_folder_path, "export", self.id)
+        export_path = os.path.join(export_folder_path, "%s.csv" % self.id)
+        if os.path.isdir(export_folder_path):
+            # remove previous export
+            if os.path.exists(export_path):
+                os.remove(export_path)
+        else:
+            os.makedirs(export_folder_path)
+
+        with codecs.open(export_path, "wb") as csvfile:
+            def longname(col):
+                return "dummy_long_col_name_{}".format(col)  # Try ensure our header is longer than real one will be
+            dummycols = [longname(col) for col in range(max_columns)]
+            writer = csv.DictWriter(csvfile, fieldnames=dummycols)
+            writer.writeheader()  # Important we have a header so we have enough space to overwrite it
+
+            for doc in _iterate_documents(doc_ids[:20001]):
+                for field_name in doc.getItems():
+                    if field_name not in headermap:
+                        print("Adding field %s" % field_name)
+                        headermap[field_name] = len(headermap) + 1
+                        assert len(headermap) < max_columns
+
+                document_values = {longname(0): doc.id}
+                for field_name, column_number in headermap.items():
+                    document_values[longname(column_number)] = doc.getItem(field_name, "") or ""
+
+                row = safe_dict(document_values)
+                writer.writerow(row)
+
+        # Cleanup leftover objects
+        transaction.abort()
+        logger.info("All documents written. Closing CSV.")
+
+        # Ensure that the document_id column has a readable name
+        headermap["doc_id"] = 0
+
+        # Fix up the header with proper fieldnames and remove all the empty columns at the end of each line
+        # Use special file object that lets us write over the same file we are reading from so we don't need two files
+        with closing(ReadOverWriteFile(export_path, encoding="utf-8")) as csvfile:
+            oldheader = csvfile.readline()  # Important the old header is longer than our new one since writing into the same file
+
+            csv_header = [field_name for field_name, _ in sorted(headermap.items(), key=lambda x: x[1])]
+            writer = csv.DictWriter(csvfile, fieldnames=csv_header)
+            writer.writeheader()
+
+            # + 2 is to account for the `/r/n` at the end of each line
+            characters_to_remove = max_columns - len(headermap) + 2
+            for line in csvfile:
+                csvfile.write(line[:-characters_to_remove].decode("utf-8") + "\r\n")
+
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
     def exportDocumentAsXML(self, xmldoc, doc):
