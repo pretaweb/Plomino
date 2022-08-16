@@ -1402,7 +1402,7 @@ class PlominoReplicationManager(Persistent):
                 document_values = {0: doc.id}
                 for column_number in column_number_field_name_mapping:
                     field_name = column_number_field_name_mapping[column_number]
-                    document_values[column_number] = doc.getItem(field_name, "") or ""
+                    document_values[column_number] = doc.getItem(field_name, "")
 
                 row = safe_dict(document_values)
                 writer.writerow(row)
