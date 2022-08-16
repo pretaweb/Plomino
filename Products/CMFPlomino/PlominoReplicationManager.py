@@ -1429,7 +1429,7 @@ class PlominoReplicationManager(Persistent):
                     max_columns - len(column_number_field_name_mapping) + 2
                 )
                 for line in csv_data_tempfile:
-                    csvfile.write(line[:-characters_to_remove].decode("utf-8") + "\r\n")
+                    csvfile.write(line[:-characters_to_remove].decode("utf-8").replace('\\n', '\n').replace('\\r', '\r') + "\r\n")
 
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
