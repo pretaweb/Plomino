@@ -110,15 +110,12 @@ def dump_decimal(self, value, write):
         }
     self.dump_struct(value, write)
 
-def _newline_safe_string(s):
-    return s.replace('\n', '\\n').replace('\r', '\\r')
-
 
 def safe_dict(data):
     if isinstance(data, str):
-        return _newline_safe_string(data)
+        return data
     elif isinstance(data, unicode):
-        return _newline_safe_string(data).encode("utf-8")
+        return data.encode("utf-8")
     elif isinstance(data, collections_abc.Mapping):
         return {k: safe_dict(v) for k, v in iteritems(data)}
     elif isinstance(data, list):
@@ -1424,12 +1421,17 @@ class PlominoReplicationManager(Persistent):
                 writer.writeheader()
 
                 csv_data_tempfile.seek(0)
-                # + 2 is to account for the `/r/n` at the end of each line
-                characters_to_remove = (
-                    max_columns - len(column_number_field_name_mapping) + 2
-                )
-                for line in csv_data_tempfile:
-                    csvfile.write(line[:-characters_to_remove].decode("utf-8").replace('\\n', '\n').replace('\\r', '\r') + "\r\n")
+                reader = csv.DictReader(csv_data_tempfile, fieldnames=fieldnames[:len(column_number_field_name_mapping)])
+                for line in reader:
+                    # Update column numbers to the actual values
+                    for key in column_number_field_name_mapping.iterkeys():
+                        if column_number_field_name_mapping[key] == None:
+                            import pdb; pdb.set_trace()
+                        line[column_number_field_name_mapping[key]] = line[key]
+                        del line[key]
+                    del line[None]
+
+                    writer.writerow(line)
 
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
