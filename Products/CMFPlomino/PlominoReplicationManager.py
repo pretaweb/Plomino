@@ -22,7 +22,7 @@ import csv
 import decimal
 import glob
 import os
-from six import iteritems
+from six import iteritems, string_types
 from io import BytesIO
 import transaction
 import xmlrpclib
@@ -45,6 +45,7 @@ from ZPublisher.HTTPRequest import FileUpload
 
 # CMF / Archetypes / Plone
 from Products.CMFCore.utils import getToolByName
+from Products.CMFPlone.utils import safe_unicode
 
 # Plomino
 from Products.CMFPlomino.config import *
@@ -109,18 +110,14 @@ def dump_decimal(self, value, write):
         'decimal': str(value),
         }
     self.dump_struct(value, write)
-
-
-def safe_dict(data):
-    if isinstance(data, str):
-        return data
-    elif isinstance(data, unicode):
-        return data.encode("utf-8")
+    
+def safe_encode(data):
+    if isinstance(data, string_types):
+        return safe_unicode(data).encode("utf-8")
     elif isinstance(data, collections_abc.Mapping):
-        return {k: safe_dict(v) for k, v in iteritems(data)}
+        return {k: safe_encode(v) for k, v in iteritems(data)}
     elif isinstance(data, list):
-        return [safe_dict(value) for value in data]
-        # return type(data)(map(safe_dict, data))
+        return [safe_encode(value) for value in data]
     else:
         return data
 
@@ -1401,7 +1398,7 @@ class PlominoReplicationManager(Persistent):
                     field_name = column_number_field_name_mapping[column_number]
                     document_values[column_number] = doc.getItem(field_name, "")
 
-                row = safe_dict(document_values)
+                row = safe_encode(document_values)
                 writer.writerow(row)
 
             # Cleanup leftover objects
@@ -1411,7 +1408,7 @@ class PlominoReplicationManager(Persistent):
             # Ensure that the document_id column has a readable name
             column_number_field_name_mapping[0] = "doc_id"
 
-            with codecs.open(export_path, "w", "utf-8") as csvfile:
+            with codecs.open(export_path, "wb") as csvfile:
                 number_of_used_columns = len(column_number_field_name_mapping)
                 csv_header = []
                 for column_number in range(number_of_used_columns):
@@ -1431,7 +1428,7 @@ class PlominoReplicationManager(Persistent):
                         del line[key]
                     del line[None]
 
-                    writer.writerow(line)
+                    writer.writerow(safe_encode(line))
 
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
