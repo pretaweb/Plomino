@@ -28,6 +28,7 @@ from zope.interface import implements
 # CMF / Archetypes / Plone
 from Products.Archetypes.atapi import *
 from Products.ATContentTypes.content.folder import ATFolder
+from Products.PortalTransforms.transforms.safe_html import scrubHTML
 
 # Plomino
 from exceptions import PlominoScriptException
@@ -726,7 +727,8 @@ class PlominoForm(ATFolder):
 
         # store fragment to cache
         html_content = self.updateCache(html_content, to_be_cached)
-        return html_content
+
+        return scrubHTML(html_content, raise_error=False)
 
     security.declareProtected(READ_PERMISSION, 'childDocument')
     def childDocument(self, doc):
