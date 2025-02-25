@@ -21,7 +21,7 @@ jobs:
       - name: Apt update
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: libxml2-dev libxslt1-dev python2-dev libbz2-dev libjpeg8-dev zlib1g-dev libtiff-dev libfreetype6 libfreetype6-dev libwebp-dev libopenjp2-7-dev libopenjp2-7-dev
+          packages: libxml2-dev libxslt1-dev python2-dev libreadline6 libreadline6-dev libbz2-dev libjpeg8-dev zlib1g-dev libtiff-dev libfreetype6 libfreetype6-dev libwebp-dev libopenjp2-7-dev libopenjp2-7-dev
           version: 1.0
       - name: Set up Python
         uses: LizardByte/setup-python-action@master
@@ -59,7 +59,7 @@ jobs:
         run: |
           bin/buildout -t 10 -Nc test-${{ matrix.plone }}.x.cfg
           bin/pip install zest.pocompile
-          bin/pocompile src
+          bin/pocompile Products
       - name: test
         run: |
             export DISPLAY=:99.0
