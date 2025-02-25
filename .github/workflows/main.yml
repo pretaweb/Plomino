@@ -18,15 +18,15 @@ jobs:
             
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Python
-        uses: LizardByte/setup-python-action@master
-        with:
-          python-version: ${{ matrix.python }}
       - name: Apt update
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: libxml2-dev libxslt1-dev python2-dev libbz2-dev libjpeg8-dev zlib1g-dev libtiff-dev libfreetype6 libfreetype6-dev libwebp-dev libopenjp2-7-dev libopenjp2-7-dev
           version: 1.0
+      - name: Set up Python
+        uses: LizardByte/setup-python-action@master
+        with:
+          python-version: ${{ matrix.python }}
       - name: Install dependencies
         run: |
           pip install virtualenv==16.7.7 wheel
