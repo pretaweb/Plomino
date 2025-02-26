@@ -28,7 +28,7 @@ from zope.interface import implements
 # CMF / Archetypes / Plone
 from Products.Archetypes.atapi import *
 from Products.ATContentTypes.content.folder import ATFolder
-from Products.PortalTransforms.transforms.safe_html import scrubHTML
+from cgi import escape
 
 # Plomino
 from exceptions import PlominoScriptException
@@ -642,12 +642,17 @@ class PlominoForm(ATFolder):
         if creation and request is not None:
             for field_id in fieldids_not_in_layout:
                 if request.has_key(field_id):
+                    safe_value = asUnicode(escape(request.get(field_id), quote=True))
+                    # cgi.escape doesn't correctly handle all possible vulnerable charaters.
+                    safe_value = safe_value.replace("'", "&apos;")
+                    safe_value = safe_value.replace('"', "&quot;")
+                    safe_value = safe_value.replace('/', "&#x2F;")
                     html_content = (
                             "<input type='hidden' "
                             "name='%s' "
                             "value='%s' />%s" % (
                                 field_id,
-                                asUnicode(request.get(field_id, '')),
+                                safe_value,
                                 html_content)
                             )
 
@@ -728,7 +733,7 @@ class PlominoForm(ATFolder):
         # store fragment to cache
         html_content = self.updateCache(html_content, to_be_cached)
 
-        return scrubHTML(html_content, raise_error=False)
+        return html_content
 
     security.declareProtected(READ_PERMISSION, 'childDocument')
     def childDocument(self, doc):
