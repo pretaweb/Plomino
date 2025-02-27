@@ -23,12 +23,12 @@ from jsonutil import jsonutil as json
 
 # Zope
 from AccessControl import ClassSecurityInfo
+from zope.tal.taldefs import quote
 from zope.interface import implements
 
 # CMF / Archetypes / Plone
 from Products.Archetypes.atapi import *
 from Products.ATContentTypes.content.folder import ATFolder
-from cgi import escape
 
 # Plomino
 from exceptions import PlominoScriptException
@@ -642,10 +642,10 @@ class PlominoForm(ATFolder):
         if creation and request is not None:
             for field_id in fieldids_not_in_layout:
                 if request.has_key(field_id):
-                    safe_value = asUnicode(escape(request.get(field_id), quote=True))
-                    # cgi.escape doesn't correctly handle all possible vulnerable charaters.
+                    safe_value = asUnicode(quote(request.get(field_id)))
+                    # safe_value = asUnicode(attrEscape(request.get(field_id), quote=True))
+                    # zope.tal.attrEscape doesn't handle all possible vulnerable charaters.
                     safe_value = safe_value.replace("'", "&apos;")
-                    safe_value = safe_value.replace('"', "&quot;")
                     safe_value = safe_value.replace('/', "&#x2F;")
                     html_content = (
                             "<input type='hidden' "
