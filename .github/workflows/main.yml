@@ -66,14 +66,23 @@ jobs:
             bin/test --layer="Plomino:Functional"
 
             export DISPLAY=:99.0
-            chromedriver --url-base=/wd/hub &
             sudo Xvfb -ac :99 -screen 0 2580x1924x24 > /dev/null 2>&1 & # optional
+            chromedriver --url-base=/wd/hub &
             sleep 3
             # #TODO robot tests are currently failing, possibly because of browser or robot changes?
             ZSERVER_HOST=127.0.0.1 ZSERVER_PORT=55001 bin/test --layer="Plomino:Robot"
 
             bin/instance stop
-            
+      - name: Upload Cypress Artifacts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          path: ./robot/tests            
+      - name: print test results
+        if: ${{ failure() }}
+        working-directory: robot/tests
+        run: cat report.html     
+        
       # - name: code-analysis
       #   run: echo "${{ matrix.plone }}" | grep 5.1 || bin/code-analysis  
       # - name: createcoverage
