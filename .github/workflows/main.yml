@@ -67,7 +67,7 @@ jobs:
 
             export DISPLAY=:99.0
             chromedriver --url-base=/wd/hub &
-            sudo Xvfb -ac :99 -screen 0 1680x1024x24 > /dev/null 2>&1 & # optional
+            sudo Xvfb -ac :99 -screen 0 1980x1924x24 > /dev/null 2>&1 & # optional
             sleep 3
             # #TODO robot tests are currently failing, possibly because of browser or robot changes?
             ZSERVER_HOST=127.0.0.1 ZSERVER_PORT=55001 bin/test --layer="Plomino:Robot"
