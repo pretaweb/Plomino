@@ -407,7 +407,7 @@ Replicate documents
     Input text      username    ${TEST_USER_ID}
     Input text      password    ${TEST_USER_PASSWORD}
     Maximize Browser Window
-    Execute Javascript   window.scrollTo(1200, 0)
+    Execute Javascript   window.scrollTo(2000, 0)
     Select Radio Button     repType   pushpull
     Click Button    save_replication
     Select Checkbox     selection-1
