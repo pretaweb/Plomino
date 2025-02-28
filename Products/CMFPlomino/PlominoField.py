@@ -335,8 +335,10 @@ class PlominoField(BaseContent, BrowserDefaultMixin):
         """
         fieldclass = component.queryUtility(interfaces.IPlominoField, self.FieldType, None)
         if fieldclass is None:
-            if hasattr(fields, self.FieldType.lower()):
-                fieldinterface = getattr(getattr(fields, self.FieldType.lower()), "I"+self.FieldType.capitalize()+"Field")
+            # Explicit datetime check because we renamed the field in b102529d - https://github.com/pretaweb/Plomino/pull/2/commits/b102529dd078d7798abdbdf48c0744da422e9270
+            if hasattr(fields, self.FieldType.lower()) or self.FieldType == "DATETIME":
+                field_module = fields.datetimefield if self.FieldType == "DATETIME" else getattr(fields, self.FieldType.lower())
+                fieldinterface = getattr(field_module, "I"+self.FieldType.capitalize()+"Field")
             else:
                 fieldinterface = getattr(getattr(fields, "base"), "IBaseField")
         else:
