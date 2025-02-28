@@ -77,12 +77,13 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v3
         with:
+          name: robot-tests
           path: ./robot/tests            
       - name: print test results
         if: ${{ failure() }}
         working-directory: robot/tests
         run: cat report.html     
-        
+
       # - name: code-analysis
       #   run: echo "${{ matrix.plone }}" | grep 5.1 || bin/code-analysis  
       # - name: createcoverage
