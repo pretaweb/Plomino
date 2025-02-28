@@ -75,10 +75,11 @@ jobs:
             bin/instance stop
       - name: Upload Cypress Artifacts
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: robot-tests
-          path: ./robot/tests            
+          path: ./robot/tests  
+          overwrite: true          
       - name: print test results
         if: ${{ failure() }}
         working-directory: robot/tests
