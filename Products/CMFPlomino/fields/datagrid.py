@@ -17,7 +17,7 @@ logger = logging.getLogger('Plomino')
 from jsonutil import jsonutil as json
 
 # Zope
-from DateTime import DateTime
+from Products.CMFPlomino import DateTime
 from zope.formlib import form
 from zope.interface import implements
 from zope import component
