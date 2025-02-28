@@ -326,7 +326,8 @@ Add datagrid row inline
 Edit datagrid row inline
     Click button  css=.plominoEdit
     Page should contain element  css=#dgfield_datagrid tbody>tr
-    Double click element  css=#dgfield_datagrid tbody>tr
+    sleep  0.5s
+    Double click element  css=#dgfield_datagrid tbody>tr>td
     Wait until page contains element  css=#dgfield_datagrid tbody>tr button.save
     Input text    dgcolumnone  That two
     Click button  css=button.save
