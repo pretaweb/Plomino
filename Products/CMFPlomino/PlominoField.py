@@ -26,7 +26,7 @@ from Products.CMFPlomino.config import *
 from Products.CMFPlomino.browser import PlominoMessageFactory as _
 from fields.selection import ISelectionField
 from fields.text import ITextField
-from fields.dtf import IDatetimeField
+from fields.datetimefield import IDatetimeField
 from fields.name import INameField
 from fields.doclink import IDoclinkField
 from ZPublisher.HTTPRequest import FileUpload
