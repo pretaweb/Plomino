@@ -206,7 +206,9 @@ Add field to layout
     [Arguments]          ${FORM_ID}  ${FIELD_ID} 
     Go to                ${PLONE_URL}/mydb/${FORM_ID}/edit
 # Switch to textile to get a textarea/ see 'contenteditable' below
+    Sleep  0.5s  # make sure tinymce loads first so it disappears properly
     Select from list     FormLayout_text_format    text/x-web-textile
+    Execute Javascript   window.scrollTo(0, 500)
     Wait until element is visible   FormLayout
 # Add to existing layout
     ${layout} =          Get text  FormLayout
@@ -299,7 +301,7 @@ Add datagrid row modal
     Page should contain element  css=#dgfield_datagrid tbody>tr
 
 Edit datagrid row modal
-    Click element  css=#dgfield_datagrid tbody>tr
+    Click element  css=#dgfield_datagrid tbody>tr>td
     Click link    dgfield_editrow
     Select frame  dgfield_iframe
     Input text    dgcolumnone  That two
@@ -324,7 +326,8 @@ Add datagrid row inline
 Edit datagrid row inline
     Click button  css=.plominoEdit
     Page should contain element  css=#dgfield_datagrid tbody>tr
-    Double click element  css=#dgfield_datagrid tbody>tr
+    sleep  0.5s
+    Double click element  css=#dgfield_datagrid tbody>tr>td
     Wait until page contains element  css=#dgfield_datagrid tbody>tr button.save
     Input text    dgcolumnone  That two
     Click button  css=button.save
@@ -335,7 +338,7 @@ Edit datagrid row inline
 Delete datagrid row
     Click button  css=.plominoEdit
     Page should contain element  css=#dgfield_datagrid tbody>tr
-    Click element  css=#dgfield_datagrid tbody>tr
+    Click element  css=#dgfield_datagrid tbody>tr>td
     Click link    dgfield_deleterow
     Wait until page contains element  css=.dataTables_empty
 
@@ -403,6 +406,8 @@ Replicate documents
     Input text      remoteUrl   ${PLONE_URL}/mydb
     Input text      username    ${TEST_USER_ID}
     Input text      password    ${TEST_USER_PASSWORD}
+    Maximize Browser Window
+    Execute Javascript   window.scrollTo(2000, 0)
     Select Radio Button     repType   pushpull
     Click Button    save_replication
     Select Checkbox     selection-1
