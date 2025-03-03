@@ -23,3 +23,7 @@ dist
 .pydevproject
 .project
 .settings
+include
+lib
+extras
+var
