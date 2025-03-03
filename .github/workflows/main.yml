@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - "master"
+      - "releases/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['2.7']
+        plone: 
+          - '4.3'
+            
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apt update
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libxml2-dev libxslt1-dev python2-dev libreadline6 libreadline6-dev libbz2-dev libjpeg8-dev zlib1g-dev libtiff-dev libfreetype6 libfreetype6-dev libwebp-dev libopenjp2-7-dev libopenjp2-7-dev
+          version: 1.0
+      - name: Set up Python
+        uses: LizardByte/setup-python-action@master
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: |
+          pip install virtualenv==16.7.7 wheel
+      - uses: nanasess/setup-chromedriver@master
+        # with:
+        #   # Optional: do not specify to match Chrome's version
+        #   chromedriver-version: '77.0.3865.40'            
+      - name: Cache multiple paths
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/buildout-cache
+            ~/extends
+            ~/.cache/pip
+          key: ${{ runner.os }}-buildout-${{ matrix.plone }}-${{ matrix.python }}
+          restore-keys: |
+            ${{ runner.os }}-buildout-
+      - name: setup buildout cache
+        run: |
+            mkdir -p ~/buildout-cache/{eggs,downloads}
+            mkdir ~/.buildout
+            echo "[buildout]" > $HOME/.buildout/default.cfg
+            echo "download-cache = $HOME/buildout-cache/downloads" >> $HOME/.buildout/default.cfg
+            echo "eggs-directory = $HOME/buildout-cache/eggs" >> $HOME/.buildout/default.cfg
+      - name: bootstrap buildout
+        run: |
+          ./bootstrap.sh test-${{ matrix.plone }}.x.cfg
+          ls -al
+      - name: buildout
+        run: |
+          bin/buildout -t 10 -Nc test-${{ matrix.plone }}.x.cfg
+          bin/pip install zest.pocompile
+          bin/pocompile Products
+      - name: test
+        run: |
+            bin/instance start
+            bin/test --layer="Plomino:Functional"
+
+            export DISPLAY=:99.0
+            sudo Xvfb -ac :99 -screen 0 2580x1924x24 > /dev/null 2>&1 & # optional
+            chromedriver --url-base=/wd/hub &
+            sleep 3
+            # #TODO robot tests are currently failing, possibly because of browser or robot changes?
+            ZSERVER_HOST=127.0.0.1 ZSERVER_PORT=55001 bin/test --layer="Plomino:Robot"
+
+            bin/instance stop
+      - name: Upload Cypress Artifacts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: robot-tests
+          path: ./parts/test/test_plomino/  
+          overwrite: true          
+      - name: print test results
+        if: ${{ failure() }}
+        working-directory: parts/test/test_plomino/
+        run: cat report.html     
+
+      # - name: code-analysis
+      #   run: echo "${{ matrix.plone }}" | grep 5.1 || bin/code-analysis  
+      # - name: createcoverage
+      #   if: ${{ (matrix.coverage) }}
+      #   run: |
+      #       bin/createcoverage
+      #       bin/coverage json -i
+      # - name: Coveralls
+      #   uses: AndreMiras/coveralls-python-action@develop
+      #   with:
+      #     parallel: true
+      #     flag-name: ${{ matrix.plone }}-${{ matrix.python }}     
+      # - name: Archive test results
+      #   if: failure()
+      #   uses: actions/upload-artifact@v1
+      #   with:
+      #     name: test_results
+      #     path: ./test
+
+  # coveralls_finish:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Coveralls Finished
+  #     uses: AndreMiras/coveralls-python-action@develop
+  #     with:
+  #       parallel-finished: true
