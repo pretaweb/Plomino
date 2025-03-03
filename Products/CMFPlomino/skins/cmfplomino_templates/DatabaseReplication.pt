@@ -497,7 +497,7 @@
 		
 		<div>
             <fieldset>
-                <legend>XML import/export</legend>
+                <legend>Import/ export</legend>
                 <table>
 				<tr><th>Import</th><th>Export</th></tr>
 				<tr><td valign="top">
@@ -572,6 +572,10 @@
 		                        i18n:attributes="title title_required;">
 		                        (Required)
 		                    </span>
+		                </div>
+		                <div class="widget">
+		                    <input type="radio" name="targettype" value="csv" id="targettype-csv"/>
+		                    <label for="export_target">To CSV file</label>
 		                </div>
 		                <div class="widget">
 		                    <input type="radio" name="targettype" value="folder" id="targettype-folder"/>

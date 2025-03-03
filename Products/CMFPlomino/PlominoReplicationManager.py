@@ -9,6 +9,7 @@
 
 __author__ = """Xavier PERROT  - Eric BREHAULT <eric.brehault@makina-corpus.org>"""
 __docformat__ = 'plaintext'
+from tempfile import TemporaryFile
 
 # Standard
 from xml.dom.minidom import getDOMImplementation
@@ -16,17 +17,25 @@ from xml.dom.minidom import parseString
 from xml.parsers.expat import ExpatError
 import base64
 import codecs
+import collections
 import csv
 import decimal
 import glob
 import os
+from six import iteritems, string_types
+from io import BytesIO
 import transaction
 import xmlrpclib
+try:
+    collections_abc = collections.abc
+except AttributeError:
+    collections_abc = collections
 
 import logging
 logger = logging.getLogger("Replication")
 
 # Zope
+from App.config import getConfiguration
 from Acquisition import *
 from AccessControl.requestmethod import postonly
 from DateTime import DateTime
@@ -36,6 +45,7 @@ from ZPublisher.HTTPRequest import FileUpload
 
 # CMF / Archetypes / Plone
 from Products.CMFCore.utils import getToolByName
+from Products.CMFPlone.utils import safe_unicode
 
 # Plomino
 from Products.CMFPlomino.config import *
@@ -100,6 +110,16 @@ def dump_decimal(self, value, write):
         'decimal': str(value),
         }
     self.dump_struct(value, write)
+    
+def safe_encode(data):
+    if isinstance(data, string_types):
+        return safe_unicode(data).encode("utf-8")
+    elif isinstance(data, collections_abc.Mapping):
+        return {k: safe_encode(v) for k, v in iteritems(data)}
+    elif isinstance(data, list):
+        return [safe_encode(value) for value in data]
+    else:
+        return data
 
 xmlrpclib.Marshaller.dispatch[plomino_decimal] = dump_decimal
 xmlrpclib.Marshaller.dispatch[decimal.Decimal] = dump_decimal
@@ -1272,6 +1292,9 @@ class PlominoReplicationManager(Persistent):
                 REQUEST.RESPONSE.setHeader('content-type', 'text/xml')
             return xmldoc.toxml()
 
+        if targettype == 'csv':
+            self.exportDocumentsAsCSV(docids)
+
         if targettype == 'folder':
             if REQUEST:
                 targetfolder = REQUEST.get('targetfolder')
@@ -1303,6 +1326,110 @@ class PlominoReplicationManager(Persistent):
         fileobj = codecs.open(path, "w", "utf-8")
         fileobj.write(content)
         fileobj.close()
+
+
+    security.declareProtected(READ_PERMISSION, 'exportDocumentsAsCSV')
+    def exportDocumentsAsCSV(self, docids=None):
+        logger.info("Starting documents CSV export...")
+
+        forms = self.getForms()
+        max_columns = (
+            1000  # Arbitrary limit of 100000 columns. We'll remove excess columns later.
+        )
+        fieldnames = range(max_columns)
+        column_number_field_name_mapping = {}
+
+        # This should map most fields, but there's some data that isndoesn't
+        #   have a definition which we'll fetch later.
+        for form in forms:
+            for field in form.getFormFields():
+                if field.id not in column_number_field_name_mapping.itervalues():
+                    column_number_field_name_mapping[
+                        len(column_number_field_name_mapping) + 1
+                    ] = field.id
+
+        # Use all of the documents if we don't specify a set of documents to use
+        doc_ids = docids if docids else self.documents.keys()
+
+        number_of_docs = len(doc_ids)
+        logger.info("Exporting %s documents..." % number_of_docs)
+
+        # Aborts the transaction to keep memory usage down. Zope keeps a
+        #   reference around to the iterated object which causes garbage
+        #   collection to not clean everything up.
+        def _iterate_documents(doc_ids_list):
+            for i, doc_id in enumerate(doc_ids_list):
+                if i % 2000 == 0:
+                    transaction.abort()
+                if i % 20000 == 0:
+                    print("Documents exported: %s/%s" % (i, number_of_docs))
+                    logger.info("Documents exported: %s/%s" % (i, number_of_docs))
+                yield self.documents[doc_id]
+
+        # Free leftover objects from getting document list
+        transaction.abort()
+        logger.info("All fieldnames checked. Starting document writing")
+
+        zope_export_folder_path = getattr(getConfiguration(), "clienthome", "")
+        export_folder_path = os.path.join(zope_export_folder_path, "export", self.id)
+        export_path = os.path.join(export_folder_path, "%s.csv" % self.id)
+        if os.path.isdir(export_folder_path):
+            # remove previous export
+            if os.path.exists(export_path):
+                os.remove(export_path)
+        else:
+            os.makedirs(export_folder_path)
+
+        # Using a temporary file to store the data, we'll write to the real file
+        #   later once we've got all the possible header combinations
+        with TemporaryFile(mode="w+b") as csv_data_tempfile:
+            writer = csv.DictWriter(csv_data_tempfile, fieldnames=fieldnames)
+
+            for doc in _iterate_documents(doc_ids):
+                for field_name in doc.getItems():
+                    if field_name not in column_number_field_name_mapping.itervalues():
+                        print("Adding field %s" % field_name)
+                        column_number_field_name_mapping[
+                            len(column_number_field_name_mapping) + 1
+                        ] = field_name
+
+                document_values = {0: doc.id}
+                for column_number in column_number_field_name_mapping:
+                    field_name = column_number_field_name_mapping[column_number]
+                    document_values[column_number] = doc.getItem(field_name, "")
+
+                row = safe_encode(document_values)
+                writer.writerow(row)
+
+            # Cleanup leftover objects
+            transaction.abort()
+            logger.info("All documents written. Closing CSV.")
+
+            # Ensure that the document_id column has a readable name
+            column_number_field_name_mapping[0] = "doc_id"
+
+            with codecs.open(export_path, "wb") as csvfile:
+                number_of_used_columns = len(column_number_field_name_mapping)
+                csv_header = []
+                for column_number in range(number_of_used_columns):
+                    header = column_number_field_name_mapping[column_number]
+                    csv_header.append(header)
+                writer = csv.DictWriter(csvfile, fieldnames=csv_header)
+                writer.writeheader()
+
+                csv_data_tempfile.seek(0)
+                reader = csv.DictReader(csv_data_tempfile, fieldnames=fieldnames[:len(column_number_field_name_mapping)])
+                for line in reader:
+                    # Update column numbers to the actual values
+                    for key in column_number_field_name_mapping.iterkeys():
+                        if column_number_field_name_mapping[key] == None:
+                            import pdb; pdb.set_trace()
+                        line[column_number_field_name_mapping[key]] = line[key]
+                        del line[key]
+                    del line[None]
+
+                    writer.writerow(safe_encode(line))
+
 
     security.declareProtected(READ_PERMISSION, 'exportDocumentAsXML')
     def exportDocumentAsXML(self, xmldoc, doc):
