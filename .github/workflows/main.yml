@@ -17,7 +17,7 @@ jobs:
           - '4.3'
             
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Apt update
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
@@ -35,7 +35,7 @@ jobs:
         #   # Optional: do not specify to match Chrome's version
         #   chromedriver-version: '77.0.3865.40'            
       - name: Cache multiple paths
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: |
             ~/buildout-cache
