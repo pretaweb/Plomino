@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# File: datetime.py
+# File: datetime_field.py
 #
 # Copyright (c) 2009 by ['Eric BREHAULT']
 #

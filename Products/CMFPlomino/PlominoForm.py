@@ -23,6 +23,7 @@ from jsonutil import jsonutil as json
 
 # Zope
 from AccessControl import ClassSecurityInfo
+from zope.tal.taldefs import attrEscape
 from zope.interface import implements
 
 # CMF / Archetypes / Plone
@@ -641,12 +642,17 @@ class PlominoForm(ATFolder):
         if creation and request is not None:
             for field_id in fieldids_not_in_layout:
                 if request.has_key(field_id):
+                    safe_value = asUnicode(attrEscape(request.get(field_id)))
+                    # safe_value = asUnicode(attrEscape(request.get(field_id), quote=True))
+                    # zope.tal.attrEscape doesn't handle all possible vulnerable charaters.
+                    safe_value = safe_value.replace("'", "&apos;")
+                    safe_value = safe_value.replace('/', "&#x2F;")
                     html_content = (
                             "<input type='hidden' "
                             "name='%s' "
                             "value='%s' />%s" % (
                                 field_id,
-                                asUnicode(request.get(field_id, '')),
+                                safe_value,
                                 html_content)
                             )
 
@@ -726,6 +732,7 @@ class PlominoForm(ATFolder):
 
         # store fragment to cache
         html_content = self.updateCache(html_content, to_be_cached)
+
         return html_content
 
     security.declareProtected(READ_PERMISSION, 'childDocument')

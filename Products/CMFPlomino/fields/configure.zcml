@@ -60,13 +60,13 @@
    <!-- DatetimeField -->
    <adapter
         for="Products.CMFPlomino.interfaces.IPlominoField"
-        provides=".datetime.IDatetimeField"
-        factory=".datetime.DatetimeField"
+        provides=".datetimefield.IDatetimeField"
+        factory=".datetimefield.DatetimeField"
         />
    <browser:page
         name="datetimesettings"
         for="Products.CMFPlomino.interfaces.IPlominoField"
-        class=".datetime.SettingForm"
+        class=".datetimefield.SettingForm"
         permission="plomino.DESIGN_PERMISSION"
         />
 
